@@ -15,7 +15,7 @@ def _normalize_sre_payload(data: dict) -> dict:
     """
     Repairs common issues in SRE JSON outputs:
     - Ensures all required keys exist
-    - Coerces list fields to lists
+    - Coerces list fields to lists and limits to max 5 items
     - Clamps confidence_delta to [-1, 1]
     """
     repaired = dict(data) if isinstance(data, dict) else {}
@@ -24,7 +24,8 @@ def _normalize_sre_payload(data: dict) -> dict:
         if not isinstance(value, list):
             repaired[key] = [] if value is None else [str(value)]
         else:
-            repaired[key] = [str(x) for x in value]
+            # Convert to strings and limit to max 5 items
+            repaired[key] = [str(x) for x in value][:5]
     # confidence_delta
     try:
         cd = float(repaired.get("confidence_delta", 0.0))
