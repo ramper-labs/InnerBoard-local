@@ -84,9 +84,15 @@ dmypy.json
 # Ignore ft/data jsonl files
 ft/data/*.jsonl
 
-# Models
+# Models - exclude large GGUF files and other model formats
 *.safetensors
 *.bin
 *.pt
 *.pth
 *.ckpt
+*.gguf
+*.ggml
+
+# Vault files (contain encrypted user data)
+vault.db
+vault.key
