@@ -7,6 +7,7 @@ import socket
 import requests
 from app.safety import no_network, NetworkAccessBlocked
 
+
 def test_no_network_blocks_socket_connection():
     """
     Ensures that socket.socket.connect is blocked within the no_network context.
@@ -15,6 +16,7 @@ def test_no_network_blocks_socket_connection():
         with no_network():
             # Use a common address for testing, e.g., Google's DNS
             socket.create_connection(("8.8.8.8", 53), timeout=1)
+
 
 def test_network_is_restored_after_context():
     """
@@ -43,6 +45,7 @@ def test_network_is_restored_after_context():
     except (socket.timeout, socket.gaierror, OSError) as e:
         pytest.fail(f"Network connection failed after context exit: {e}")
 
+
 def test_no_network_blocks_higher_level_libraries():
     """
     Ensures that libraries like 'requests' are also blocked.
@@ -55,7 +58,9 @@ def test_no_network_blocks_higher_level_libraries():
             except requests.exceptions.RequestException as e:
                 # We need to check if the underlying cause is our custom exception
                 if not isinstance(e.__cause__, NetworkAccessBlocked):
-                    pytest.fail(f"Request failed but not due to NetworkAccessBlocked. Cause: {e.__cause__}")
+                    pytest.fail(
+                        f"Request failed but not due to NetworkAccessBlocked. Cause: {e.__cause__}"
+                    )
                 else:
                     # This is the expected path. Re-raise our exception to satisfy pytest.raises.
                     raise e.__cause__

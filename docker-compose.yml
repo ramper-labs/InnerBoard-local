@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: innerboard-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  innerboard:
+    build: .
+    container_name: innerboard-app
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - innerboard_data:/app/data
+      - ./vault.key:/app/data/vault.key:ro
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - LOG_LEVEL=INFO
+    working_dir: /app/data
+    command: ["innerboard", "list"]
+    profiles:
+      - app
+
+volumes:
+  ollama_data:
+    driver: local
+  innerboard_data:
+    driver: local

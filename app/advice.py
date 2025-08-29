@@ -2,6 +2,7 @@
 Orchestrates the Structured Reflection Extraction (SRE) and
 Micro-Advice Composer (MAC) capabilities.
 """
+
 import json
 from app.llm import LocalLLM
 from app.models import SREOutput, MACOutput
@@ -58,8 +59,10 @@ def _normalize_mac_payload(data: dict) -> dict:
 
 def _fallback_mac_from_sre(sre: SREOutput) -> MACOutput:
     """Create a minimal, pragmatic MACOutput from SRE when model output is insufficient."""
-    first_blocker = (sre.blockers[0] if sre.blockers else "onboarding tasks")
-    first_resource = (sre.resources_needed[0] if sre.resources_needed else "documentation")
+    first_blocker = sre.blockers[0] if sre.blockers else "onboarding tasks"
+    first_resource = (
+        sre.resources_needed[0] if sre.resources_needed else "documentation"
+    )
     steps = [
         f"Book a 20-min help session about {first_blocker}",
         f"Find and read {first_resource}",
@@ -77,7 +80,9 @@ def _fallback_mac_from_sre(sre: SREOutput) -> MACOutput:
     ]
     # Heuristic urgency
     urgent_set = {"env", "k8s", "access"}
-    urgency = "high" if any(cat in " ".join(sre.blockers) for cat in urgent_set) else "medium"
+    urgency = (
+        "high" if any(cat in " ".join(sre.blockers) for cat in urgent_set) else "medium"
+    )
     return MACOutput(steps=steps[:6], checklist=checklist[:5], urgency=urgency)
 
 
@@ -85,6 +90,7 @@ class AdviceService:
     """
     A service to process reflections and generate advice.
     """
+
     def __init__(self, llm: LocalLLM):
         """
         Initializes the service with a local LLM instance.
@@ -108,13 +114,15 @@ class AdviceService:
         """
         messages = [
             {"role": "system", "content": self.sre_prompt},
-            {"role": "user", "content": f"Reflection: {raw_text}"}
+            {"role": "user", "content": f"Reflection: {raw_text}"},
         ]
-        
+
         raw_json = self.llm.generate(messages)
-        
+
         try:
-            cleaned_json = raw_json.strip().replace("```json", "").replace("```", "").strip()
+            cleaned_json = (
+                raw_json.strip().replace("```json", "").replace("```", "").strip()
+            )
             data = json.loads(cleaned_json)
             # Repair payload before validation
             repaired = _normalize_sre_payload(data)
@@ -124,25 +132,31 @@ class AdviceService:
                     repaired[k] = [] if k != "confidence_delta" else 0.0
             return SREOutput(**repaired)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to decode LLM output as JSON: {e}\nRaw output: {raw_json}")
+            raise ValueError(
+                f"Failed to decode LLM output as JSON: {e}\nRaw output: {raw_json}"
+            )
         except ValidationError as e:
-            raise ValueError(f"LLM output did not match SRE schema: {e}\nRaw output: {raw_json}")
+            raise ValueError(
+                f"LLM output did not match SRE schema: {e}\nRaw output: {raw_json}"
+            )
 
     def get_micro_advice(self, sre_output: SREOutput) -> MACOutput:
         """
         Uses the MAC model to generate actionable advice from structured data.
         """
         sre_json = sre_output.model_dump_json()
-        
+
         messages = [
             {"role": "system", "content": self.mac_prompt},
-            {"role": "user", "content": sre_json}
+            {"role": "user", "content": sre_json},
         ]
-        
+
         raw_json = self.llm.generate(messages)
 
         try:
-            cleaned_json = raw_json.strip().replace("```json", "").replace("```", "").strip()
+            cleaned_json = (
+                raw_json.strip().replace("```json", "").replace("```", "").strip()
+            )
             data = json.loads(cleaned_json)
             repaired = _normalize_mac_payload(data)
             for k in REQUIRED_MAC_KEYS:
@@ -186,6 +200,7 @@ def main():
         print(mac_result.model_dump_json(indent=2))
     except Exception as e:
         print(f"\nAn error occurred during the demonstration: {e}")
+
 
 if __name__ == "__main__":
     main()

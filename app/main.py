@@ -9,6 +9,7 @@ from app.advice import AdviceService
 from app.safety import no_network
 import sys
 
+
 def handle_add(args, vault: EncryptedVault):
     """Handles adding a new reflection and generating advice."""
     reflection_text = args.text
@@ -33,13 +34,13 @@ def handle_add(args, vault: EncryptedVault):
 
             print("Analyzing reflection...")
             sre_output = service.get_structured_reflection(reflection_text)
-            
+
             print("Composing advice...")
             mac_output = service.get_micro_advice(sre_output)
 
             print("\n--- Your Micro-Advice ---")
             print(f"Urgency: {mac_output.urgency.capitalize()}")
-            
+
             print("\nRecommended Steps:")
             for i, step in enumerate(mac_output.steps, 1):
                 print(f"{i}. {step}")
@@ -50,7 +51,10 @@ def handle_add(args, vault: EncryptedVault):
 
     except Exception as e:
         print(f"\nAn error occurred during AI processing: {e}", file=sys.stderr)
-        print("The reflection was saved, but advice could not be generated.", file=sys.stderr)
+        print(
+            "The reflection was saved, but advice could not be generated.",
+            file=sys.stderr,
+        )
 
 
 def handle_list(args, vault: EncryptedVault):
@@ -60,13 +64,14 @@ def handle_list(args, vault: EncryptedVault):
     if not reflections:
         print("No reflections found.")
         return
-    
+
     for rid, text in reflections:
         # Show first line or 80 characters
-        preview = text.split('\n')[0]
+        preview = text.split("\n")[0]
         if len(preview) > 80:
             preview = preview[:77] + "..."
         print(f"ID {rid}: {preview}")
+
 
 def main():
     """Main entry point for the CLI."""
@@ -76,7 +81,9 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # 'add' command
-    parser_add = subparsers.add_parser("add", help="Add a new reflection and get advice.")
+    parser_add = subparsers.add_parser(
+        "add", help="Add a new reflection and get advice."
+    )
     parser_add.add_argument(
         "-t", "--text", type=str, help="The reflection text to add."
     )
@@ -97,6 +104,7 @@ def main():
             handle_list(args, vault)
     finally:
         vault.close()
+
 
 if __name__ == "__main__":
     main()
