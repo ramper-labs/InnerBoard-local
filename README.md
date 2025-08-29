@@ -21,8 +21,8 @@ InnerBoard-local is designed for new hires who want to reflect privately on thei
                                      │                               │                               │
                                      │                               ▼                               ▼
                                      │                    ┌────────────────────┐        ┌──────────────────┐
-                                     └──────────────────▶ │ Local GGUF Model   │◀──────▶│ Micro-Advice     │
-                                                          │ (llama.cpp)        │        │ Output           │
+                                     └──────────────────▶ │ Local Ollama Model │◀──────▶│ Micro-Advice     │
+                                                          │ (localhost:11434)  │        │ Output           │
                                                           └────────────────────┘        └──────────────────┘
 ```
 
@@ -45,9 +45,9 @@ InnerBoard-local is designed for new hires who want to reflect privately on thei
   - Urgency assessment
 
 ### ⚡ **Performance**
-- **GGUF Models**: Quantized for efficient local inference
-- **Metal GPU Support**: Optimized for Apple Silicon
-- **Configurable**: Adjust model size, GPU layers, context window
+- **Ollama Local Serving**: Uses Ollama to run models locally
+- **GPU Support**: Leverages your platform's capabilities via Ollama
+- **Configurable**: Choose model by name and adjust Ollama host
 
 ## 🚀 Quick Start
 
@@ -58,31 +58,25 @@ git clone https://github.com/ramper-labs/InnerBoard-local.git
 cd InnerBoard-local
 ```
 
-**For macOS (Apple Silicon):**
-```bash
-CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
-pip install -r requirements.txt
-```
-
-**For other systems:**
+**Install Python dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Download a Model
+**Install and run Ollama:**
+- Download Ollama: `https://ollama.com/download`
+- Ensure the server is running (default: `http://localhost:11434`).
 
-**Option A: Quick Test (Small Model)**
+**Pull a model (example):**
 ```bash
-# Download a small model for testing (~400MB)
-hf download bartowski/Qwen2.5-0.5B-Instruct-GGUF --include "*Q4_K_M.gguf" --local-dir ft/data
-export GGUF_MODEL_PATH="ft/data/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf"
+ollama pull gpt-oss:20b
 ```
 
-**Option B: Production (Full Model)**
+### 2. Select a Model
+
+The default model is `gpt-oss:20b`. To change it:
 ```bash
-# Download the full gpt-oss-20b model (~14GB)
-hf download Maziyar/gpt-oss-20b-GGUF --include "*Q5_K_M.gguf" --local-dir ft/data
-export GGUF_MODEL_PATH="ft/data/gpt-oss-20b.Q5_K_M.gguf"
+export OLLAMA_MODEL="llama3.1"
 ```
 
 ### 3. Usage
@@ -134,25 +128,12 @@ python -m app.main list
 
 ### Environment Variables
 
-- `GGUF_MODEL_PATH`: Path to your GGUF model file
-- `N_GPU_LAYERS`: Number of layers to offload to GPU (-1 for all, 0 for CPU-only)
-- `N_CTX`: Context window size (default: 2048)
+- `OLLAMA_MODEL`: Name of the model to use (default: `gpt-oss:20b`)
+- `OLLAMA_HOST`: Optional custom Ollama host (default: `http://localhost:11434`)
 
-### Example Configurations
+### Example Configuration
 
-**High Performance (GPU):**
-```bash
-export GGUF_MODEL_PATH="ft/data/gpt-oss-20b.Q5_K_M.gguf"
-export N_GPU_LAYERS=-1
-export N_CTX=4096
-```
-
-**CPU Only:**
-```bash
-export GGUF_MODEL_PATH="ft/data/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf"
-export N_GPU_LAYERS=0
-export N_CTX=2048
-```
+Ollama manages CPU/GPU automatically depending on your setup.
 
 ## 🧪 Testing
 
@@ -188,9 +169,9 @@ InnerBoard-local/
 
 ### Custom Models
 
-You can use any GGUF model by setting the path:
+Use any Ollama model by name:
 ```bash
-export GGUF_MODEL_PATH="/path/to/your/model.gguf"
+export OLLAMA_MODEL="llama3.1"
 python -m app.main add --text "Your reflection"
 ```
 
@@ -200,21 +181,18 @@ Process multiple reflections from a file:
 ```bash
 while IFS= read -r line; do
     python -m app.main add --text "$line"
+
 done < reflections.txt
 ```
 
 ### Debugging
 
-Enable verbose mode for troubleshooting:
-```bash
-export LLAMA_LOG_LEVEL=1
-python -m app.main add --text "Your reflection"
-```
+Enable verbose logging in your shell as needed; Ollama server logs appear in its console.
 
 ## 🛡️ Security Features
 
 - **Encrypted Storage**: All reflections encrypted at rest using Fernet (AES-128)
-- **Network Isolation**: Automatic network blocking during AI processing
+- **Network Isolation**: Blocks all outbound traffic during AI processing, allowing only loopback to `localhost:11434` for Ollama
 - **Local Processing**: No data transmission to external services
 - **Memory Safety**: Models run in isolated processes
 
@@ -230,7 +208,7 @@ python -m app.main add --text "Your reflection"
 This project follows the technical plan for the "Best Local Agent" hackathon category. Key areas for contribution:
 
 1. **Fine-tuning**: Improve SRE accuracy with domain-specific training data
-2. **Models**: Test and optimize different GGUF models
+2. **Models**: Test and optimize different Ollama models
 3. **UI**: Add Streamlit interface for better UX
 4. **Export**: Implement privacy-preserving analytics
 
@@ -240,8 +218,7 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- Built on [llama.cpp](https://github.com/ggerganov/llama.cpp) for efficient local inference
-- Uses [OpenAI's gpt-oss models](https://huggingface.co/openai/gpt-oss-20b) for reasoning
+- Powered by [Ollama](https://github.com/ollama/ollama) for local model serving
 - Inspired by the need for private, offline onboarding support
 
 ---

@@ -2,9 +2,4 @@ cryptography
 pydantic
 pytest
 requests
-# For local LLM execution with llama.cpp
-llama-cpp-python
-# Pinned to a version known to work well.
-# Newer versions might have Metal issues.
-# For Metal GPU acceleration on macOS, it's often installed with special flags.
-# e.g., CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
+ollama

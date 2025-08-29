@@ -26,9 +26,8 @@ def handle_add(args, vault: EncryptedVault):
         # on the first run. This part needs network access.
         llm = LocalLLM()
 
-        # Once the model is loaded and cached, all subsequent operations
-        # can and should be performed offline.
-        with no_network():
+        # Allow loopback so we can talk to the local Ollama server only.
+        with no_network(allow_loopback=True, allowed_ports=(11434,)):
             print("Model loaded. Running analysis offline...")
             service = AdviceService(llm)
 

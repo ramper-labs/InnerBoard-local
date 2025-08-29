@@ -18,14 +18,30 @@ def _guarded_connect(self, address):
     raise NetworkAccessBlocked(f"Attempted to connect to {address} with network disabled.")
 
 @contextmanager
-def no_network():
+def no_network(allow_loopback: bool = False, allowed_ports: tuple = ()):  # type: ignore[override]
     """
-    A context manager that blocks all outbound network connections
-    by monkey-patching `socket.socket.connect`.
+    A context manager that blocks all outbound network connections by monkey-patching
+    `socket.socket.connect`.
+
+    Args:
+        allow_loopback: If True, permit connections to localhost (127.0.0.1, ::1).
+        allowed_ports: Optional tuple of port numbers to allow when loopback is permitted.
     """
+    def _conditional_connect(self, address):  # type: ignore[override]
+        host, port = address
+        if allow_loopback:
+            try:
+                # Fast path for numeric addresses
+                is_loopback = host in ("127.0.0.1", "::1") or host.lower() == "localhost"
+            except AttributeError:
+                is_loopback = False
+            if is_loopback and (not allowed_ports or port in allowed_ports):
+                return _original_connect(self, address)
+        raise NetworkAccessBlocked(f"Attempted to connect to {address} with network disabled.")
+
     try:
-        # Replace the original connect method with our guarded one
-        socket.socket.connect = _guarded_connect
+        # Replace the original connect method with our guarded one (conditional if needed)
+        socket.socket.connect = _conditional_connect if allow_loopback else _guarded_connect
         yield
     finally:
         # Restore the original connect method

@@ -1,44 +1,26 @@
 """
-Handles loading and running the local LLM using llama-cpp-python.
+Handles loading and running the local LLM using the Ollama Python client.
 """
 
 import os
-from llama_cpp import Llama
 from typing import List, Dict
+from ollama import Client
 
-# Allow overriding the model path via environment variable for testing/switching models
-MODEL_PATH = os.getenv("GGUF_MODEL_PATH", "ft/data/gpt-oss-20b.Q5_K_M.gguf")
-
-# Optional tuning via env vars
-ENV_N_GPU_LAYERS = os.getenv("N_GPU_LAYERS")
-ENV_N_CTX = os.getenv("N_CTX")
+# Allow overriding the Ollama model via environment variable for testing/switching models
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
 
 class LocalLLM:
     """
-    A wrapper for a local GGUF model using llama-cpp-python.
+    A wrapper around a local Ollama model served on localhost.
     """
     def __init__(self):
         """
-        Initializes and loads the GGUF model.
+        Initializes the Ollama client. Assumes the Ollama server is running locally.
         """
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(
-                f"Model file not found at {MODEL_PATH}. "
-                "Please download the GGUF model and place it in the ft/data/ directory, "
-                "or set GGUF_MODEL_PATH to a valid .gguf file."
-            )
 
-        n_gpu_layers = int(ENV_N_GPU_LAYERS) if ENV_N_GPU_LAYERS is not None else -1
-        n_ctx = int(ENV_N_CTX) if ENV_N_CTX is not None else 2048
-
-        print(f"Loading model: {MODEL_PATH}...")
-        self.llm = Llama(
-            model_path=MODEL_PATH,
-            n_gpu_layers=n_gpu_layers,  # Offload layers to the GPU if available
-            n_ctx=n_ctx,                # Context window size
-            verbose=False,              # Suppress verbose llama.cpp output
-        )
-        print("Model loaded successfully.")
+        self.client = Client()
+        self.model = OLLAMA_MODEL
+        print(f"Using Ollama model: {self.model}")
 
     def generate(self, messages: List[Dict[str, str]], max_new_tokens: int = 512) -> str:
         """
@@ -51,23 +33,30 @@ class LocalLLM:
         Returns:
             str: The content of the assistant's response.
         """
-        response = self.llm.create_chat_completion(
+        response = self.client.chat(
+            model=self.model,
             messages=messages,
-            max_tokens=max_new_tokens,
-            temperature=0.7,
-            top_p=0.95,
+            options={
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "num_predict": max_new_tokens,
+            },
         )
-        
-        if response and "choices" in response and response["choices"]:
-            return response["choices"][0]["message"]["content"]
-        
-        return "Error: Could not generate a valid response."
+
+        try:
+            content = response["message"]["content"]
+        except Exception:
+            try:
+                content = response.message.content
+            except Exception:
+                content = "Error: Could not generate a valid response."
+        return content
 
 def main():
     """
-    Demonstrates the LocalLLM class with the new GGUF backend.
+    Demonstrates the LocalLLM class with the Ollama backend.
     """
-    print("--- GGUF LLM Loader Demonstration ---")
+    print("--- Ollama LLM Demonstration ---")
     try:
         llm = LocalLLM()
         
