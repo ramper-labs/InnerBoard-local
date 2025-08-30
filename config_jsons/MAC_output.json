@@ -1,0 +1,16 @@
+{
+    "team_update": [
+      "Repo is synced and all tests passed ✅",
+      "Working on resolving Docker build failure"
+    ],
+    "manager_update": [
+      "All core tests are green, showing stability",
+      "Main blocker: Docker build fails with EOF — may require infra support",
+      "Considering npm audit fixes for 3 vulnerabilities"
+    ],
+    "recommendations": [
+      "Escalate Docker build issue to infra team",
+      "Schedule npm audit fix before next sprint"
+    ]
+}
+  

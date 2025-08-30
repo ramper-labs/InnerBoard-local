@@ -1,0 +1,25 @@
+[
+    {
+    "summary": "High-level overview of what happened in this session",
+    "key_successes": [
+      {
+        "desc": "Pulled latest code and ran all tests successfully",
+        "specifics": "Ran git pull + pytest",
+        "adjacent_context": "The tests passed successfully"
+      }
+    ],
+    "blockers": [
+      {
+        "desc": "Docker build failed with 'unexpected EOF'",
+        "impact": "Deployment blocked until resolved",
+        "owner_hint": "Infra team",
+        "resolution_hint": "Check Dockerfile for syntax errors"
+      }
+    ],
+    "resources": [
+      "Check Dockerfile integrity",
+      "Run docker build with --no-cache"
+    ]
+}
+]
+  
