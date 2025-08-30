@@ -6,11 +6,11 @@ from pathlib import Path
 
 # Read README
 this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
+long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 # Read requirements
 def read_requirements():
-    with open("requirements.txt", "r") as f:
+    with open("requirements.txt", "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
 setup(
