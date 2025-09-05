@@ -2,6 +2,15 @@
 
 .PHONY: help install install-dev test test-cov test-no-network lint format clean docker-build docker-run docker-stop setup-ollama
 
+# Determine docker compose command (supports v2 plugin and legacy v1)
+ifeq ($(shell command -v docker-compose >/dev/null 2>&1; echo $$?),0)
+DOCKER_COMPOSE := docker-compose
+else ifeq ($(shell command -v docker >/dev/null 2>&1; echo $$?),0)
+DOCKER_COMPOSE := docker compose
+else
+DOCKER_COMPOSE := docker-compose
+endif
+
 # Default target
 help: ## Show this help message
 	@echo "InnerBoard-local Development Commands:"
@@ -43,10 +52,10 @@ docker-run: ## Run InnerBoard in Docker
 		innerboard-local
 
 docker-compose-up: ## Start all services with docker-compose
-	docker-compose up -d
+	$(DOCKER_COMPOSE) up -d
 
 docker-compose-down: ## Stop all services
-	docker-compose down
+	$(DOCKER_COMPOSE) down
 
 # Ollama setup
 setup-ollama: ## Pull the default model for Ollama
