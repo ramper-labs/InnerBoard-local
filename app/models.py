@@ -3,7 +3,7 @@ Pydantic models for structured data used throughout the application.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Literal
+from typing import List
 
 
 class Reflection(BaseModel):
@@ -12,85 +12,78 @@ class Reflection(BaseModel):
     raw_text: str
 
 
-class SREOutput(BaseModel):
-    """
-    Structured Reflection Extraction (SRE) model.
-    Represents the structured data extracted from a raw reflection.
-    """
+class SREKeySuccess(BaseModel):
+    """Represents a concrete success derived from console activity."""
 
-    key_points: List[str] = Field(
-        ..., description="A list of terse, key points from the reflection.", max_items=5
+    desc: str = Field(..., description="Short description of what worked or was achieved")
+    specifics: str = Field(
+        ..., description="Commands, artifacts, or concrete details supporting the success"
     )
-    blockers: List[str] = Field(
-        ..., description="A list of identified blockers or challenges.", max_items=5
-    )
-    resources_needed: List[str] = Field(
-        ...,
-        description="A list of resources or help needed to overcome blockers.",
-        max_items=5,
-    )
-    confidence_delta: float = Field(
-        ...,
-        description="A float between -1.0 and 1.0 indicating the change in confidence.",
-        ge=-1.0,
-        le=1.0,
+    adjacent_context: str = Field(
+        ..., description="Related context like services, repos, or files involved"
     )
 
 
-class MACOutput(BaseModel):
-    """
-    Micro-Advice Composer (MAC) model.
-    Represents the actionable advice generated from a structured reflection.
-    """
+class SREBlocker(BaseModel):
+    """Represents a blocker derived from console activity."""
 
-    steps: List[str] = Field(
-        ...,
-        description="A list of 3-6 imperative, time-bound steps to take.",
-        min_items=3,
-        max_items=6,
+    desc: str = Field(..., description="What is blocked or failing")
+    impact: str = Field(..., description="Impact of the blocker on outcomes or timelines")
+    owner_hint: str = Field(..., description="Likely owner/team/role to help")
+    resolution_hint: str = Field(..., description="Concrete next step to move forward")
+
+
+class SRESession(BaseModel):
+    """A single session summary extracted from console activity."""
+
+    summary: str = Field(..., description="High-level summary for the session")
+    key_successes: List[SREKeySuccess] = Field(
+        default_factory=list, description="1–5 key successes from the session"
     )
-    checklist: List[str] = Field(
-        ...,
-        description="A list of up to 5 checklist items for progress tracking.",
-        max_items=5,
+    blockers: List[SREBlocker] = Field(
+        default_factory=list, description="0–5 blockers from the session"
     )
-    urgency: Literal["low", "medium", "high"] = Field(
-        ..., description="The assessed urgency of the situation."
+    resources: List[str] = Field(
+        default_factory=list, description="0–7 resource strings (links, commands, paths)"
+    )
+
+
+class MACMeetingPrep(BaseModel):
+    """Meeting-prep outputs: team/manager updates and actionable recommendations."""
+
+    team_update: List[str] = Field(
+        default_factory=list, description="2–5 peer-friendly progress updates"
+    )
+    manager_update: List[str] = Field(
+        default_factory=list, description="2–5 outcome/risks/timeline updates"
+    )
+    recommendations: List[str] = Field(
+        default_factory=list, description="2–5 concrete next-step recommendations"
     )
 
 
 def main():
-    """Demonstrates the usage of the Pydantic models."""
-    print("Demonstrating SREOutput model...")
-    sre_data = {
-        "key_points": ["Ingress not routing", "Docs unclear"],
-        "blockers": ["k8s ingress config", "missing example"],
-        "resources_needed": ["working ingress example", "cluster access"],
-        "confidence_delta": -0.4,
-    }
-    try:
-        sre_model = SREOutput(**sre_data)
-        print("SREOutput validation successful:")
-        print(sre_model.model_dump_json(indent=2))
-    except Exception as e:
-        print(f"SREOutput validation failed: {e}")
-
-    print("\nDemonstrating MACOutput model...")
-    mac_data = {
-        "steps": [
-            "Book a 15-min pair session with a senior engineer.",
-            "Find a working ingress YAML in the team's repo.",
-            "Document the fix in a personal snippets file.",
+    """Quick demo of the Pydantic models."""
+    example = SRESession(
+        summary="Investigated ingress routing and validated service wiring",
+        key_successes=[
+            SREKeySuccess(
+                desc="Validated cluster DNS",
+                specifics="ran kubectl exec busybox -- nslookup service",
+                adjacent_context="k8s cluster dev-east, svc payment-api",
+            )
         ],
-        "checklist": ["Session booked", "YAML found", "Snippet saved"],
-        "urgency": "high",
-    }
-    try:
-        mac_model = MACOutput(**mac_data)
-        print("MACOutput validation successful:")
-        print(mac_model.model_dump_json(indent=2))
-    except Exception as e:
-        print(f"MACOutput validation failed: {e}")
+        blockers=[
+            SREBlocker(
+                desc="Ingress rule not matching host",
+                impact="Service unreachable from external LB",
+                owner_hint="Platform team",
+                resolution_hint="Compare nginx ingress annotations with prod",
+            )
+        ],
+        resources=["docs/ingress.md"],
+    )
+    print(example.model_dump_json(indent=2))
 
 
 if __name__ == "__main__":

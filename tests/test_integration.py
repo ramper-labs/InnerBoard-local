@@ -67,7 +67,7 @@ class TestFullWorkflow:
         mock_client = MagicMock()
         mock_response = {
             "message": {
-                "content": '{"key_points": ["Kubernetes networking issues"], "blockers": ["ingress routing"], "resources_needed": ["documentation"], "confidence_delta": -0.3}'
+                "content": '[{"summary": "Investigated ingress routing", "key_successes": [{"desc": "Validated DNS", "specifics": "nslookup payment-api", "adjacent_context": "dev cluster"}], "blockers": [{"desc": "Ingress rule mismatch", "impact": "External access failing", "owner_hint": "Platform", "resolution_hint": "Align annotations"}], "resources": ["docs/ingress.md"]}]'
             }
         }
         mock_client.chat.return_value = mock_response
@@ -94,14 +94,13 @@ class TestFullWorkflow:
             # Create advice service
             service = AdviceService(llm)
 
-            # Test SRE (structured reflection extraction)
-            test_text = "I can't get the Kubernetes ingress to work properly."
-            sre_result = service.get_structured_reflection(test_text)
-
-            assert sre_result.key_points == ["Kubernetes networking issues"]
-            assert sre_result.blockers == ["ingress routing"]
-            assert sre_result.resources_needed == ["documentation"]
-            assert sre_result.confidence_delta == -0.3
+            # Test console insights (SRE sessions)
+            test_console = "kubectl describe ingress payments; nslookup payment-api"
+            sessions = service.get_console_insights(test_console)
+            assert len(sessions) == 1
+            s0 = sessions[0]
+            assert "ingress" in s0.summary.lower()
+            assert s0.key_successes and s0.blockers
 
             # Verify mock was called
             mock_client.chat.assert_called()

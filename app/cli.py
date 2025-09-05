@@ -92,9 +92,9 @@ def cli(
 def add(
     ctx: click.Context, text: str, model: Optional[str], temperature: Optional[float]
 ):
-    """Add a new reflection and generate advice.
+    """Add a new console activity log and generate meeting prep.
 
-    TEXT: The reflection text to add and analyze.
+    TEXT: The raw console activity text to analyze.
 
     Example:
         innerboard add "I'm struggling with the new authentication service..."
@@ -119,11 +119,11 @@ def add(
         # Initialize vault
         vault = EncryptedVault(db_path, key)
 
-        # Add reflection
+        # Add console text to vault (stored as a reflection entry for now)
         with console.status("[bold green]Saving reflection..."):
             reflection_id = vault.add_reflection(text)
 
-        console.print(f"[green]✓[/green] Reflection saved with ID: {reflection_id}")
+        console.print(f"[green]✓[/green] Entry saved with ID: {reflection_id}")
 
         # Initialize LLM
         with console.status("[bold green]Initializing AI model..."):
@@ -138,19 +138,19 @@ def add(
             ) as progress:
                 task = progress.add_task("Analyzing reflection...", total=None)
 
-                # Get structured reflection
-                progress.update(task, description="Extracting structured data...")
+                # Extract console insights (sessions)
+                progress.update(task, description="Extracting console session insights...")
                 service = AdviceService(llm)
-                sre_output = service.get_structured_reflection(text)
+                sessions = service.get_console_insights(text)
 
-                # Get micro-advice
-                progress.update(task, description="Generating actionable advice...")
-                mac_output = service.get_micro_advice(sre_output)
+                # Generate meeting prep
+                progress.update(task, description="Composing meeting prep...")
+                prep = service.get_meeting_prep(sessions)
 
                 progress.update(task, description="Complete!")
 
         # Display results
-        display_advice(sre_output, mac_output)
+        display_meeting_prep(sessions, prep)
 
     except InnerBoardError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -523,42 +523,70 @@ def models():
         sys.exit(1)
 
 
-def display_advice(sre_output, mac_output):
-    """Display structured advice in a formatted way."""
-    # SRE Output
-    console.print("\n[bold blue]📊 Structured Analysis[/bold blue]")
+def display_meeting_prep(sessions, prep):
+    """Display session insights and meeting-prep outputs."""
+    console.print("\n[bold blue]📊 Console Session Insights[/bold blue]")
 
-    sre_table = Table()
-    sre_table.add_column("Aspect", style="cyan", no_wrap=True)
-    sre_table.add_column("Details", style="white")
+    if not sessions:
+        console.print("[dim]No sessions extracted from console activity.[/dim]")
+    else:
+        for idx, s in enumerate(sessions, 1):
+            console.print(Panel.fit(s.summary, title=f"Session {idx} Summary"))
+            table = Table()
+            table.add_column("Type", style="cyan", no_wrap=True)
+            table.add_column("Details", style="white")
 
-    sre_table.add_row(
-        "Key Points", "\n".join(f"• {point}" for point in sre_output.key_points)
-    )
-    sre_table.add_row(
-        "Blockers", "\n".join(f"• {blocker}" for blocker in sre_output.blockers)
-    )
-    sre_table.add_row(
-        "Resources Needed",
-        "\n".join(f"• {resource}" for resource in sre_output.resources_needed),
-    )
-    sre_table.add_row("Confidence Change", f"{sre_output.confidence_delta:+.2f}")
+            if s.key_successes:
+                for ks in s.key_successes:
+                    table.add_row(
+                        "Success",
+                        f"{ks.desc}\n[dim]specifics:[/dim] {ks.specifics}\n[dim]context:[/dim] {ks.adjacent_context}",
+                    )
+            if s.blockers:
+                for b in s.blockers:
+                    table.add_row(
+                        "Blocker",
+                        f"{b.desc}\n[dim]impact:[/dim] {b.impact}\n[dim]owner:[/dim] {b.owner_hint}\n[dim]next:[/dim] {b.resolution_hint}",
+                    )
+            if s.resources:
+                table.add_row("Resources", "\n".join(f"• {r}" for r in s.resources))
+            console.print(table)
 
-    console.print(sre_table)
+    console.print("\n[bold green]🗣️ Meeting Prep[/bold green]")
 
-    # MAC Output
-    console.print(
-        f"\n[bold green]🎯 Actionable Advice[/bold green] ([bold]{mac_output.urgency.upper()}[/bold] Priority)"
-    )
+    if prep.team_update:
+        console.print("\n[bold]Team Update:[/bold]")
+        for item in prep.team_update:
+            console.print(f"  • {item}")
 
-    console.print("\n[bold]Recommended Steps:[/bold]")
-    for i, step in enumerate(mac_output.steps, 1):
-        console.print(f"  {i}. {step}")
+    if prep.manager_update:
+        console.print("\n[bold]Manager Update:[/bold]")
+        for item in prep.manager_update:
+            console.print(f"  • {item}")
 
-    if mac_output.checklist:
-        console.print("\n[bold]Progress Checklist:[/bold]")
-        for item in mac_output.checklist:
-            console.print(f"  □ {item}")
+    if prep.recommendations:
+        console.print("\n[bold]Recommendations:[/bold]")
+        for item in prep.recommendations:
+            console.print(f"  • {item}")
+
+
+@cli.command()
+@click.argument("console_text", required=True)
+@click.option("--model", help="Override the default Ollama model")
+@click.pass_context
+def prep(ctx: click.Context, console_text: str, model: Optional[str]):
+    """Generate meeting prep from CONSOLE_TEXT (paste from your shell)."""
+    try:
+        with console.status("[bold green]Initializing AI model..."):
+            llm = LocalLLM(model=model if model else config.ollama_model)
+        service = AdviceService(llm)
+        with no_network():
+            sessions = service.get_console_insights(console_text)
+            prep = service.get_meeting_prep(sessions)
+        display_meeting_prep(sessions, prep)
+    except Exception as e:
+        logger.error(f"prep command failed: {e}")
+        console.print(f"[red]Error:[/red] {e}")
 
 
 if __name__ == "__main__":

@@ -11,50 +11,46 @@ import sys
 
 
 def handle_add(args, vault: EncryptedVault):
-    """Handles adding a new reflection and generating advice."""
-    reflection_text = args.text
-    if not reflection_text:
+    """Handles adding console activity and generating meeting prep."""
+    console_text = args.text
+    if not console_text:
         print("Error: The --text argument is required for the 'add' command.")
         return
 
-    print("Adding new reflection to the vault...")
-    reflection_id = vault.add_reflection(reflection_text)
-    print(f"Reflection saved with ID: {reflection_id}")
+    print("Adding console activity to the vault...")
+    reflection_id = vault.add_reflection(console_text)
+    print(f"Entry saved with ID: {reflection_id}")
 
     print("\nInitializing local AI models (this may take a moment)...")
     try:
-        # First, we initialize the LLM, which may require downloading the model
-        # on the first run. This part needs network access.
         llm = LocalLLM()
-
-        # Allow loopback so we can talk to the local Ollama server only.
         with no_network(allow_loopback=True, allowed_ports=(11434,)):
             print("Model loaded. Running analysis offline...")
             service = AdviceService(llm)
 
-            print("Analyzing reflection...")
-            sre_output = service.get_structured_reflection(reflection_text)
+            print("Extracting console session insights...")
+            sessions = service.get_console_insights(console_text)
 
-            print("Composing advice...")
-            mac_output = service.get_micro_advice(sre_output)
+            print("Composing meeting prep...")
+            prep = service.get_meeting_prep(sessions)
 
-            print("\n--- Your Micro-Advice ---")
-            print(f"Urgency: {mac_output.urgency.capitalize()}")
-
-            print("\nRecommended Steps:")
-            for i, step in enumerate(mac_output.steps, 1):
-                print(f"{i}. {step}")
-
-            print("\nChecklist:")
-            for item in mac_output.checklist:
-                print(f"- [ ] {item}")
+            print("\n--- Meeting Prep ---")
+            if prep.team_update:
+                print("\nTeam Update:")
+                for item in prep.team_update:
+                    print(f"• {item}")
+            if prep.manager_update:
+                print("\nManager Update:")
+                for item in prep.manager_update:
+                    print(f"• {item}")
+            if prep.recommendations:
+                print("\nRecommendations:")
+                for item in prep.recommendations:
+                    print(f"• {item}")
 
     except Exception as e:
         print(f"\nAn error occurred during AI processing: {e}", file=sys.stderr)
-        print(
-            "The reflection was saved, but advice could not be generated.",
-            file=sys.stderr,
-        )
+        print("The entry was saved, but meeting prep could not be generated.", file=sys.stderr)
 
 
 def handle_list(args, vault: EncryptedVault):
