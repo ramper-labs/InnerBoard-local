@@ -10,6 +10,8 @@ from app.models import (
     SRESession,
     MACMeetingPrep,
 )
+from app.utils import safe_json_loads
+from app.config import config
 
 
 class AdviceService:
@@ -25,6 +27,15 @@ class AdviceService:
         with open("prompts/mac_system_prompt.txt", "r") as f:
             self.mac_prompt = f.read()
 
+    def _extract_json_array_text(self, raw_json: str) -> str:
+        """Remove fences and isolate the outermost JSON array if present."""
+        s = raw_json.strip().replace("```json", "").replace("```", "").strip()
+        start = s.find("[")
+        end = s.rfind("]")
+        if start != -1 and end != -1 and end > start:
+            return s[start : end + 1]
+        return s
+
     def get_console_insights(self, console_text: str) -> List[SRESession]:
         """Extract per-session insights from raw console activity text."""
         messages = [
@@ -32,25 +43,54 @@ class AdviceService:
             {"role": "user", "content": console_text},
         ]
         raw_json = self.llm.generate(messages)
-        try:
-            cleaned_json = (
-                raw_json.strip().replace("```json", "").replace("```", "").strip()
-            )
-            data = json.loads(cleaned_json)
-            if not isinstance(data, list):
-                data = []
-            sessions: List[SRESession] = []
-            for item in data:
-                try:
-                    sessions.append(SRESession(**item))
-                except ValidationError:
-                    # Skip invalid items rather than failing the whole batch
-                    continue
-            return sessions
-        except json.JSONDecodeError as e:
-            raise ValueError(
-                f"Failed to decode SRE output as JSON: {e}\nRaw output: {raw_json}"
-            )
+        cleaned_json = self._extract_json_array_text(raw_json)
+        data = safe_json_loads(cleaned_json, default=None)
+
+        parse_failed = False
+
+        # If single object returned, coerce into a list
+        if data is None:
+            obj = safe_json_loads(cleaned_json.strip().strip(","), default=None)
+            if isinstance(obj, dict):
+                data = [obj]
+            else:
+                parse_failed = True
+
+        if not isinstance(data, list):
+            data = []
+
+        sessions: List[SRESession] = []
+        for item in data:
+            try:
+                sessions.append(SRESession(**item))
+            except ValidationError:
+                continue
+
+        if parse_failed:
+            retry_messages = messages + [
+                {
+                    "role": "user",
+                    "content": (
+                        "The previous response was not valid JSON. "
+                        "Respond with ONLY a JSON array of session objects matching the schema. "
+                        "Do not include markdown or commentary."
+                    ),
+                }
+            ]
+            retry_temp = max(config.temperature - 0.2, 0.1)
+            retry_raw = self.llm.generate(retry_messages, temperature=retry_temp)
+            retry_clean = self._extract_json_array_text(retry_raw)
+            retry_data = safe_json_loads(retry_clean, default=None)
+            if isinstance(retry_data, dict):
+                retry_data = [retry_data]
+            if isinstance(retry_data, list):
+                sessions = []
+                for item in retry_data:
+                    try:
+                        sessions.append(SRESession(**item))
+                    except ValidationError:
+                        continue
+        return sessions
 
     def get_meeting_prep(self, sessions: List[SRESession]) -> MACMeetingPrep:
         """Generate team/manager updates and recommendations from SRE sessions."""
@@ -60,19 +100,31 @@ class AdviceService:
             {"role": "user", "content": sessions_json},
         ]
         raw_json = self.llm.generate(messages)
-        try:
-            cleaned_json = (
-                raw_json.strip().replace("```json", "").replace("```", "").strip()
-            )
-            data = json.loads(cleaned_json)
-            # Ensure arrays exist
-            for key in ("team_update", "manager_update", "recommendations"):
-                if key not in data or not isinstance(data[key], list):
-                    data[key] = []
-            return MACMeetingPrep(**data)
-        except json.JSONDecodeError as e:
-            # If MAC decoding fails, return empty prep to avoid breaking CLI
-            return MACMeetingPrep()
+        cleaned_json = self._extract_json_array_text(raw_json)
+        data = safe_json_loads(cleaned_json, default=None)
+        if not isinstance(data, dict):
+            retry_messages = messages + [
+                {
+                    "role": "user",
+                    "content": (
+                        "The previous response was not a valid JSON object. "
+                        "Respond with ONLY a JSON object containing keys: "
+                        "team_update, manager_update, recommendations (each an array). "
+                        "Do not include markdown or commentary."
+                    ),
+                }
+            ]
+            retry_temp = max(config.temperature - 0.2, 0.1)
+            retry_raw = self.llm.generate(retry_messages, temperature=retry_temp)
+            cleaned_json = self._extract_json_array_text(retry_raw)
+            data = safe_json_loads(cleaned_json, default=None)
+            if not isinstance(data, dict):
+                return MACMeetingPrep()
+
+        for key in ("team_update", "manager_update", "recommendations"):
+            if key not in data or not isinstance(data[key], list):
+                data[key] = []
+        return MACMeetingPrep(**data)
 
 
 def main():
