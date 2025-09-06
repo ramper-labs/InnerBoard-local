@@ -206,7 +206,7 @@ def main():
         ]
 
         print("User: (Using SRE prompt)")
-        sre_response = llm.generate(sre_messages)
+        sre_response = llm.generate(sre_messages, max_new_tokens=config.max_tokens)
         print("Assistant (raw JSON output):")
         print(sre_response)
 

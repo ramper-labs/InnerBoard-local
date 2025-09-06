@@ -20,6 +20,6 @@
       "Check Dockerfile integrity",
       "Run docker build with --no-cache"
     ]
-}
+    }
 ]
   

@@ -94,5 +94,8 @@ ft/data/*.jsonl
 *.ggml
 
 # Vault files (contain encrypted user data)
-vault.db
+vault.db**
 vault.key
+
+# output files (for testing)
+output.txt

@@ -350,6 +350,36 @@ class Timer:
             logger.debug(f"{self.name} completed in {duration.total_seconds():.2f}s")
 
 
+def clean_terminal_log(log_content: str) -> str:
+    """
+    Clean terminal log by removing line numbers and ANSI escape codes.
+    Args:
+        log_content: The raw content of the log file.
+    Returns:
+        Cleaned text.
+    """
+    import re
+    from typing import List
+    lines = log_content.splitlines()
+    cleaned_lines: List[str] = []
+    for line in lines:
+        if '|' in line:
+            parts = line.split('|', 1)
+            if len(parts) == 2:
+                content = parts[1]
+            else:
+                content = line
+        else:
+            content = line
+        content = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', content)
+        content = re.sub(r'[\x00-\x1f\x7f]', '', content)
+        content = content.strip()
+        if content:
+            cleaned_lines.append(content)
+    print('\n'.join(cleaned_lines))
+    return '\n'.join(cleaned_lines)
+
+
 def main():
     """Demonstrate utility functions."""
     print("=== InnerBoard Utilities Demo ===")

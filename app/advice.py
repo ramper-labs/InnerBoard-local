@@ -12,6 +12,9 @@ from app.models import (
 )
 from app.utils import safe_json_loads
 from app.config import config
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AdviceService:
@@ -42,7 +45,8 @@ class AdviceService:
             {"role": "system", "content": self.sre_prompt},
             {"role": "user", "content": console_text},
         ]
-        raw_json = self.llm.generate(messages)
+        raw_json = self.llm.generate(messages, max_new_tokens=config.max_tokens)
+        logger.debug(f"Initial LLM response: {raw_json}")
         cleaned_json = self._extract_json_array_text(raw_json)
         data = safe_json_loads(cleaned_json, default=None)
 
@@ -50,6 +54,7 @@ class AdviceService:
 
         # If single object returned, coerce into a list
         if data is None:
+            logger.warning(f"Failed to parse initial response: {cleaned_json}")
             obj = safe_json_loads(cleaned_json.strip().strip(","), default=None)
             if isinstance(obj, dict):
                 data = [obj]
@@ -78,7 +83,7 @@ class AdviceService:
                 }
             ]
             retry_temp = max(config.temperature - 0.2, 0.1)
-            retry_raw = self.llm.generate(retry_messages, temperature=retry_temp)
+            retry_raw = self.llm.generate(retry_messages, temperature=retry_temp, max_new_tokens=config.max_tokens)
             retry_clean = self._extract_json_array_text(retry_raw)
             retry_data = safe_json_loads(retry_clean, default=None)
             if isinstance(retry_data, dict):
@@ -99,7 +104,7 @@ class AdviceService:
             {"role": "system", "content": self.mac_prompt},
             {"role": "user", "content": sessions_json},
         ]
-        raw_json = self.llm.generate(messages)
+        raw_json = self.llm.generate(messages, max_new_tokens=config.max_tokens)
         cleaned_json = self._extract_json_array_text(raw_json)
         data = safe_json_loads(cleaned_json, default=None)
         if not isinstance(data, dict):
@@ -115,7 +120,7 @@ class AdviceService:
                 }
             ]
             retry_temp = max(config.temperature - 0.2, 0.1)
-            retry_raw = self.llm.generate(retry_messages, temperature=retry_temp)
+            retry_raw = self.llm.generate(retry_messages, temperature=retry_temp, max_new_tokens=config.max_tokens)
             cleaned_json = self._extract_json_array_text(retry_raw)
             data = safe_json_loads(cleaned_json, default=None)
             if not isinstance(data, dict):

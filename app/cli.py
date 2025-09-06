@@ -14,6 +14,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm, Prompt
+import json
 
 from app.config import config
 from app.storage import EncryptedVault, load_key
@@ -23,7 +24,7 @@ from app.safety import no_network
 from app.logging_config import get_logger
 from app.exceptions import InnerBoardError, EncryptionError
 from app.security import SecureKeyManager
-from app.utils import format_timestamp, format_reflection_preview
+from app.utils import format_timestamp, format_reflection_preview, clean_terminal_log
 
 logger = get_logger(__name__)
 console = Console()
@@ -586,6 +587,37 @@ def prep(ctx: click.Context, console_text: str, model: Optional[str]):
         display_meeting_prep(sessions, prep)
     except Exception as e:
         logger.error(f"prep command failed: {e}")
+        console.print(f"[red]Error:[/red] {e}")
+
+
+@cli.command()
+@click.argument("log_file", type=click.Path(exists=True))
+@click.option("--model", help="Override the default Ollama model")
+@click.option("--output", type=click.Path(), help="Path to save the JSON output")
+@click.pass_context
+def process_log(ctx: click.Context, log_file: str, model: Optional[str], output: Optional[str]):
+    """Process terminal log file and generate SRE_output.json format."""
+    try:
+        # Read log file
+        with open(log_file, 'r') as f:
+            log_content = f.read()
+        # Clean the log
+        cleaned_text = clean_terminal_log(log_content)
+        with console.status("[bold green]Initializing AI model..."):
+            llm = LocalLLM(model=model if model else config.ollama_model)
+        service = AdviceService(llm)
+        with no_network():
+            sessions = service.get_console_insights(cleaned_text)
+        # Convert to JSON
+        json_data = json.dumps([s.model_dump() for s in sessions], indent=2)
+        if output:
+            with open(output, 'w') as f:
+                f.write(json_data)
+            console.print(f"[green]✓[/green] Output saved to {output}")
+        else:
+            console.print(json_data)
+    except Exception as e:
+        logger.error(f"process_log command failed: {e}")
         console.print(f"[red]Error:[/red] {e}")
 
 

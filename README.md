@@ -669,7 +669,6 @@ InnerBoard-local/
 │   ├── __init__.py
 │   ├── cfg/                     # Configuration files
 │   ├── data/                    # Training data (gitignored)
-│   ├── eval.py                  # Evaluation scripts
 │   └── synth/                   # Synthetic data generation
 ├── tests/                       # Comprehensive test suite (50 tests)
 │   ├── __init__.py
