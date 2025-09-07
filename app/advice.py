@@ -32,22 +32,56 @@ class AdviceService:
 
     def _extract_json_array_text(self, raw_json: str) -> str:
         """Remove fences and isolate the outermost JSON array if present."""
-        s = raw_json.strip().replace("```json", "").replace("```", "").strip()
+        s = raw_json.strip()
+        
+        # Remove markdown code fences
+        s = s.replace("```json", "").replace("```", "").strip()
+        
+        # Look for JSON array
         start = s.find("[")
         end = s.rfind("]")
         if start != -1 and end != -1 and end > start:
             return s[start : end + 1]
+        
+        # Look for JSON object (fallback)
+        start = s.find("{")
+        end = s.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return s[start : end + 1]
+            
+        return s
+
+    def _extract_json_object_text(self, raw_json: str) -> str:
+        """Remove fences and isolate the outermost JSON object if present."""
+        s = raw_json.strip()
+        
+        # Remove markdown code fences
+        s = s.replace("```json", "").replace("```", "").strip()
+        
+        # Look for JSON object first
+        start = s.find("{")
+        end = s.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return s[start : end + 1]
+        
+        # Fallback to array
+        start = s.find("[")
+        end = s.rfind("]")
+        if start != -1 and end != -1 and end > start:
+            return s[start : end + 1]
+            
         return s
 
     def get_console_insights(self, console_text: str) -> List[SRESession]:
         """Extract per-session insights from raw console activity text."""
         messages = [
             {"role": "system", "content": self.sre_prompt},
-            {"role": "user", "content": console_text},
+            {"role": "user", "content": f"Console activity to analyze:\n\n{console_text}\n\nReturn ONLY the JSON array, no explanations or markdown:"},
         ]
         raw_json = self.llm.generate(messages, max_new_tokens=config.max_tokens)
         logger.debug(f"Initial LLM response: {raw_json}")
         cleaned_json = self._extract_json_array_text(raw_json)
+        logger.debug(f"Cleaned JSON: {cleaned_json}")
         data = safe_json_loads(cleaned_json, default=None)
 
         parse_failed = False
@@ -71,19 +105,15 @@ class AdviceService:
             except ValidationError:
                 continue
 
-        if parse_failed:
-            retry_messages = messages + [
-                {
-                    "role": "user",
-                    "content": (
-                        "The previous response was not valid JSON. "
-                        "Respond with ONLY a JSON array of session objects matching the schema. "
-                        "Do not include markdown or commentary."
-                    ),
-                }
+        if parse_failed or not sessions:
+            # More aggressive retry with explicit JSON-only instruction
+            retry_messages = [
+                {"role": "system", "content": "You must respond with ONLY valid JSON. No text, no markdown, no explanations. Just pure JSON."},
+                {"role": "user", "content": f"Convert this console activity to a JSON array following this exact schema:\n[{{'summary': 'string', 'key_successes': [{{'desc': 'string', 'specifics': 'string', 'adjacent_context': 'string'}}], 'blockers': [{{'desc': 'string', 'impact': 'string', 'owner_hint': 'string', 'resolution_hint': 'string'}}], 'resources': ['string']}}]\n\nConsole activity:\n{console_text}\n\nJSON:"}
             ]
-            retry_temp = max(config.temperature - 0.2, 0.1)
+            retry_temp = max(config.temperature - 0.3, 0.0)
             retry_raw = self.llm.generate(retry_messages, temperature=retry_temp, max_new_tokens=config.max_tokens)
+            logger.debug(f"Retry LLM response: {retry_raw}")
             retry_clean = self._extract_json_array_text(retry_raw)
             retry_data = safe_json_loads(retry_clean, default=None)
             if isinstance(retry_data, dict):
@@ -99,33 +129,33 @@ class AdviceService:
 
     def get_meeting_prep(self, sessions: List[SRESession]) -> MACMeetingPrep:
         """Generate team/manager updates and recommendations from SRE sessions."""
-        sessions_json = json.dumps([s.model_dump() for s in sessions])
+        sessions_json = json.dumps([s.model_dump() for s in sessions], indent=2)
         messages = [
             {"role": "system", "content": self.mac_prompt},
-            {"role": "user", "content": sessions_json},
+            {"role": "user", "content": f"SRE session data to analyze:\n\n{sessions_json}\n\nReturn ONLY the JSON object, no explanations or markdown:"},
         ]
         raw_json = self.llm.generate(messages, max_new_tokens=config.max_tokens)
-        cleaned_json = self._extract_json_array_text(raw_json)
+        logger.debug(f"Initial MAC LLM response: {raw_json}")
+        cleaned_json = self._extract_json_object_text(raw_json)
+        logger.debug(f"Cleaned MAC JSON: {cleaned_json}")
         data = safe_json_loads(cleaned_json, default=None)
+        
         if not isinstance(data, dict):
-            retry_messages = messages + [
-                {
-                    "role": "user",
-                    "content": (
-                        "The previous response was not a valid JSON object. "
-                        "Respond with ONLY a JSON object containing keys: "
-                        "team_update, manager_update, recommendations (each an array). "
-                        "Do not include markdown or commentary."
-                    ),
-                }
+            # More aggressive retry with explicit JSON-only instruction
+            retry_messages = [
+                {"role": "system", "content": "You must respond with ONLY valid JSON. No text, no markdown, no explanations. Just pure JSON."},
+                {"role": "user", "content": f"Convert these SRE sessions to a JSON object following this exact schema:\n{{'team_update': ['string'], 'manager_update': ['string'], 'recommendations': ['string']}}\n\nSRE sessions:\n{sessions_json}\n\nJSON:"}
             ]
-            retry_temp = max(config.temperature - 0.2, 0.1)
+            retry_temp = max(config.temperature - 0.3, 0.0)
             retry_raw = self.llm.generate(retry_messages, temperature=retry_temp, max_new_tokens=config.max_tokens)
-            cleaned_json = self._extract_json_array_text(retry_raw)
+            logger.debug(f"Retry MAC LLM response: {retry_raw}")
+            cleaned_json = self._extract_json_object_text(retry_raw)
             data = safe_json_loads(cleaned_json, default=None)
             if not isinstance(data, dict):
+                logger.warning("Failed to get valid MAC JSON response, returning empty")
                 return MACMeetingPrep()
 
+        # Ensure all required keys exist and are lists
         for key in ("team_update", "manager_update", "recommendations"):
             if key not in data or not isinstance(data[key], list):
                 data[key] = []

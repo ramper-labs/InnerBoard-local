@@ -25,6 +25,7 @@ from app.logging_config import get_logger
 from app.exceptions import InnerBoardError, EncryptionError
 from app.security import SecureKeyManager
 from app.utils import format_timestamp, format_reflection_preview, clean_terminal_log
+from app.models import SRESession
 
 logger = get_logger(__name__)
 console = Console()
@@ -165,12 +166,12 @@ def add(
             vault.close()
 
 
-@cli.command()
+@cli.command("list")
 @click.option(
     "--limit", type=int, default=10, help="Maximum number of reflections to show"
 )
 @click.pass_context
-def list(ctx: click.Context, limit: int):
+def list_reflections(ctx: click.Context, limit: int):
     """List all saved reflections.
 
     Shows a preview of each reflection with its ID and timestamp.
@@ -618,6 +619,84 @@ def process_log(ctx: click.Context, log_file: str, model: Optional[str], output:
             console.print(json_data)
     except Exception as e:
         logger.error(f"process_log command failed: {e}")
+        console.print(f"[red]Error:[/red] {e}")
+
+
+@cli.command()
+@click.argument("sre_files", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("--model", help="Override the default Ollama model")
+@click.option("--output", type=click.Path(), help="Path to save the MAC JSON output")
+@click.pass_context
+def generate_mac(ctx: click.Context, sre_files: tuple, model: Optional[str], output: Optional[str]):
+    """Generate Meeting Advice Composer (MAC) output from SRE session JSON files.
+    
+    SRE_FILES: One or more SRE session JSON files to process.
+    
+    Example:
+        innerboard generate-mac config_jsons/SRE_output1.json config_jsons/SRE_output2.json --output config_jsons/MAC_output.json
+    """
+    try:
+        # Read and combine all SRE session files
+        all_sessions = []
+        for sre_file in sre_files:
+            console.print(f"[dim]Reading {sre_file}...[/dim]")
+            with open(sre_file, 'r') as f:
+                sessions_data = json.load(f)
+                if isinstance(sessions_data, list):
+                    all_sessions.extend(sessions_data)
+                else:
+                    all_sessions.append(sessions_data)
+        
+        if not all_sessions:
+            console.print("[yellow]No sessions found in the provided files.[/yellow]")
+            return
+        
+        console.print(f"[dim]Loaded {len(all_sessions)} sessions from {len(sre_files)} file(s)[/dim]")
+        
+        # Initialize LLM and service
+        with console.status("[bold green]Initializing AI model..."):
+            llm = LocalLLM(model=model if model else config.ollama_model)
+        service = AdviceService(llm)
+        
+        # Convert sessions data to SRESession objects for validation
+        validated_sessions = []
+        for session_data in all_sessions:
+            try:
+                validated_sessions.append(SRESession(**session_data))
+            except Exception as e:
+                logger.warning(f"Skipping invalid session data: {e}")
+                continue
+        
+        if not validated_sessions:
+            console.print("[red]No valid sessions found in the provided files.[/red]")
+            return
+        
+        # Generate MAC output
+        with console.status("[bold green]Generating meeting prep..."):
+            with no_network():
+                mac_output = service.get_meeting_prep(validated_sessions)
+        
+        # Convert to JSON
+        mac_json = mac_output.model_dump_json(indent=2)
+        
+        if output:
+            with open(output, 'w') as f:
+                f.write(mac_json)
+            console.print(f"[green]✓[/green] MAC output saved to {output}")
+        else:
+            console.print(mac_json)
+            
+        # Display summary
+        console.print(f"\n[bold blue]📋 Meeting Prep Summary[/bold blue]")
+        if mac_output.team_update:
+            console.print(f"[green]Team Updates:[/green] {len(mac_output.team_update)} items")
+        if mac_output.manager_update:
+            console.print(f"[blue]Manager Updates:[/blue] {len(mac_output.manager_update)} items")
+        if mac_output.recommendations:
+            console.print(f"[yellow]Recommendations:[/yellow] {len(mac_output.recommendations)} items")
+            
+    except Exception as e:
+        logger.error(f"generate_mac command failed: {e}")
         console.print(f"[red]Error:[/red] {e}")
 
 
