@@ -34,10 +34,10 @@ console = Console()
 def print_welcome():
     """Print welcome message."""
     welcome_text = Text("InnerBoard-local", style="bold blue")
-    subtitle = Text("Your private onboarding reflection coach", style="italic cyan")
+    subtitle = Text("Your private meeting prep assistant.", style="italic cyan")
     console.print(
         Panel.fit(
-            f"[bold blue]InnerBoard-local[/bold blue]\n[italic cyan]Your private onboarding reflection coach[/italic cyan]"
+            f"[bold blue]InnerBoard-local[/bold blue]\n[italic cyan]Your private meeting prep assistant.[/italic cyan]"
         )
     )
     console.print()
@@ -60,9 +60,9 @@ def format_reflection_preview(text: str, max_length: int = 80) -> str:
 def cli(
     ctx: click.Context, db_path: Optional[str], key_path: Optional[str], verbose: bool
 ):
-    """InnerBoard-local: Your private onboarding reflection coach.
+    """InnerBoard-local: Your private meeting prep assistant.
 
-    A 100% offline onboarding reflection coach that turns private journaling
+    A 100% offline meeting prep assistant that turns private journaling
     into structured signals and concrete micro-advice.
     """
     # Store configuration in context
@@ -583,7 +583,8 @@ def prep(ctx: click.Context, console_text: str, model: Optional[str]):
             llm = LocalLLM(model=model if model else config.ollama_model)
         service = AdviceService(llm)
         with no_network():
-            sessions = service.get_console_insights(console_text)
+            cleaned_text = clean_terminal_log(console_text)
+            sessions = service.get_console_insights(cleaned_text)
             prep = service.get_meeting_prep(sessions)
         display_meeting_prep(sessions, prep)
     except Exception as e:
