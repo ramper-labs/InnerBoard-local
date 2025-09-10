@@ -6,7 +6,7 @@ Provides a user-friendly command-line interface with rich formatting and progres
 import sys
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import shutil
 import subprocess
 import platform
@@ -555,21 +555,115 @@ def display_meeting_prep(sessions, prep):
             console.print(f"  • {item}")
 
 
+def display_mac_only(prep):
+    """Display only the meeting-prep (MAC) outputs without SRE details."""
+    console.print("\n[bold green]🗣️ Meeting Prep[/bold green]")
+
+    if prep.team_update:
+        console.print("\n[bold]Team Update:[/bold]")
+        for item in prep.team_update:
+            console.print(f"  • {item}")
+
+    if prep.manager_update:
+        console.print("\n[bold]Manager Update:[/bold]")
+        for item in prep.manager_update:
+            console.print(f"  • {item}")
+
+    if prep.recommendations:
+        console.print("\n[bold]Recommendations:[/bold]")
+        for item in prep.recommendations:
+            console.print(f"  • {item}")
+
+
+def _load_all_sre_sessions_from_dir(base_dir: Path) -> List[SRESession]:
+    """Recursively load all SRE sessions from `sre.json` files under base_dir."""
+    sessions_raw: List[dict] = []
+    try:
+        for sre_path in base_dir.rglob("sre.json"):
+            try:
+                with sre_path.open("r", encoding="utf-8") as fp:
+                    data = json.load(fp)
+                    if isinstance(data, list):
+                        sessions_raw.extend(data)
+                    elif isinstance(data, dict):
+                        sessions_raw.append(data)
+            except Exception as e:
+                logger.warning(f"Failed to read {sre_path}: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to scan SRE directory {base_dir}: {e}")
+
+    validated: List[SRESession] = []
+    for session_data in sessions_raw:
+        try:
+            validated.append(SRESession(**session_data))
+        except Exception as e:
+            logger.warning(f"Skipping invalid SRE session: {e}")
+    return validated
+
+
 @cli.command()
-@click.argument("console_text", required=True)
 @click.option("--model", help="Override the default Ollama model")
+@click.option(
+    "--show-sre",
+    is_flag=True,
+    help="Also display detailed SRE session insights (verbose mode)",
+)
 @click.pass_context
-def prep(ctx: click.Context, console_text: str, model: Optional[str]):
-    """Generate meeting prep from CONSOLE_TEXT (paste from your shell)."""
+def prep(ctx: click.Context, model: Optional[str], show_sre: bool):
+    """Generate MAC from all stored SRE sessions and display with saved reflections."""
     try:
         with console.status("[bold green]Initializing AI model..."):
             llm = LocalLLM(model=model if model else config.ollama_model)
         service = AdviceService(llm)
+
+        # Aggregate all SRE sessions from the sessions directory
+        sessions_dir = get_sessions_dir()
+        console.print(f"[dim]Loading SRE sessions from {sessions_dir}...[/dim]")
+        sessions = _load_all_sre_sessions_from_dir(sessions_dir)
+        if not sessions:
+            console.print("[yellow]No SRE sessions found. Record a session first with 'innerboard record'.[/yellow]")
+
+        if not sessions:
+            return
+
         with no_network():
-            cleaned_text = clean_terminal_log(console_text)
-            sessions = service.get_console_insights(cleaned_text)
             prep = service.get_meeting_prep(sessions)
-        display_meeting_prep(sessions, prep)
+
+        # Display meeting prep (concise by default, verbose with --show-sre)
+        if show_sre:
+            display_meeting_prep(sessions, prep)
+        else:
+            display_mac_only(prep)
+
+        # Display saved reflections from the encrypted vault
+        db_path = ctx.obj.get("db_path", config.db_path)
+        key_path = ctx.obj.get("key_path", config.key_path)
+        console.print("\n[bold blue]🗂️ Saved Reflections[/bold blue]")
+        try:
+            if not Path(key_path).exists():
+                console.print("[yellow]No encryption key found. Run 'innerboard init' to set up your vault.[/yellow]")
+            else:
+                password = os.getenv("INNERBOARD_KEY_PASSWORD")
+                with console.status("[bold green]Loading vault reflections..."):
+                    key = load_key(password)
+                    vault = EncryptedVault(db_path, key)
+                    reflections = vault.get_all_reflections()
+                    vault.close()
+
+                if not reflections:
+                    console.print("[dim]No reflections saved yet.[/dim]")
+                else:
+                    table = Table(title=f"Reflections ({len(reflections)} total)")
+                    table.add_column("ID", style="cyan", no_wrap=True)
+                    table.add_column("Preview", style="white")
+                    table.add_column("Timestamp", style="dim")
+                    for reflection_id, text, created_at, _updated_at in reflections[:10]:
+                        preview = format_reflection_preview(text)
+                        table.add_row(str(reflection_id), preview, str(created_at))
+                    console.print(table)
+        except Exception as e:
+            logger.warning(f"Failed to load/display reflections: {e}")
+            console.print("[yellow]Could not load saved reflections.[/yellow]")
     except Exception as e:
         logger.error(f"prep command failed: {e}")
         console.print(f"[red]Error:[/red] {e}")
