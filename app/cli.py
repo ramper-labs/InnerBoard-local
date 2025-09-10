@@ -7,6 +7,9 @@ import sys
 import os
 from pathlib import Path
 from typing import Optional
+import shutil
+import subprocess
+import platform
 import click
 from rich.console import Console
 from rich.table import Table
@@ -24,8 +27,15 @@ from app.safety import no_network
 from app.logging_config import get_logger
 from app.exceptions import InnerBoardError, EncryptionError
 from app.security import SecureKeyManager
-from app.utils import format_timestamp, format_reflection_preview, clean_terminal_log
+from app.utils import (
+    format_timestamp,
+    format_reflection_preview,
+    clean_terminal_log,
+    get_sessions_dir,
+    build_unique_session_path,
+)
 from app.models import SRESession
+from app.session_monitor import SessionMonitor
 
 logger = get_logger(__name__)
 console = Console()
@@ -94,7 +104,7 @@ def cli(
 def add(
     ctx: click.Context, text: str, model: Optional[str], temperature: Optional[float]
 ):
-    """Add a new console activity log and generate meeting prep.
+    """Add a new console activity log to the vault only.
 
     TEXT: The raw console activity text to analyze.
 
@@ -121,38 +131,11 @@ def add(
         # Initialize vault
         vault = EncryptedVault(db_path, key)
 
-        # Add console text to vault (stored as a reflection entry for now)
+        # Add console text to vault
         with console.status("[bold green]Saving reflection..."):
             reflection_id = vault.add_reflection(text)
 
         console.print(f"[green]✓[/green] Entry saved with ID: {reflection_id}")
-
-        # Initialize LLM
-        with console.status("[bold green]Initializing AI model..."):
-            llm = LocalLLM(model=model if model else config.ollama_model)
-
-        # Process with network guard
-        with no_network():
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-            ) as progress:
-                task = progress.add_task("Analyzing reflection...", total=None)
-
-                # Extract console insights (sessions)
-                progress.update(task, description="Extracting console session insights...")
-                service = AdviceService(llm)
-                sessions = service.get_console_insights(text)
-
-                # Generate meeting prep
-                progress.update(task, description="Composing meeting prep...")
-                prep = service.get_meeting_prep(sessions)
-
-                progress.update(task, description="Complete!")
-
-        # Display results
-        display_meeting_prep(sessions, prep)
 
     except InnerBoardError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -622,6 +605,164 @@ def process_log(ctx: click.Context, log_file: str, model: Optional[str], output:
         logger.error(f"process_log command failed: {e}")
         console.print(f"[red]Error:[/red] {e}")
 
+
+@cli.command()
+@click.option(
+    "--dir",
+    "output_dir",
+    type=click.Path(file_okay=False),
+    help="Directory to save the session log (defaults to app data sessions dir)",
+)
+@click.option(
+    "--name",
+    "filename",
+    type=str,
+    help="Optional filename (without path). Defaults to a unique session name",
+)
+@click.option(
+    "--shell",
+    "shell_path",
+    type=str,
+    help="Shell to launch for recording (defaults to $SHELL or powershell)",
+)
+@click.option(
+    "--flush/--no-flush",
+    "flush",
+    default=True,
+    help="Flush after each write for near-real-time updates (default: enabled)",
+)
+def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optional[str], flush: bool):
+    """Record an interactive terminal session to a uniquely named file.
+
+    On Linux/macOS/WSL, uses the 'script' utility to record a subshell.
+    On native Windows, uses PowerShell transcription.
+    """
+    try:
+        # Determine target directory and ensure it exists
+        sessions_dir = get_sessions_dir()
+        if output_dir:
+            try:
+                from app.utils import ensure_directory  # lazy import to avoid clutter
+            except Exception:
+                console.print("[red]Failed to import ensure_directory[/red]")
+                sys.exit(1)
+            sessions_dir = ensure_directory(output_dir)
+
+        # Determine output file
+        if filename:
+            safe_name = filename
+            from app.utils import sanitize_filename
+
+            safe_name = sanitize_filename(safe_name)
+            if not (safe_name.endswith(".log") or safe_name.endswith(".txt")):
+                safe_name += ".log"
+            output_path = Path(sessions_dir) / safe_name
+        else:
+            output_path = build_unique_session_path(base_dir=sessions_dir, extension="log")
+
+        console.print(f"[dim]Saving session to: {output_path}[/dim]")
+
+        is_windows = os.name == "nt" and "microsoft" not in platform.release().lower()
+
+        if not is_windows:
+            # POSIX / WSL path
+            script_path = shutil.which("script")
+            if not script_path:
+                console.print(
+                    "[red]The 'script' utility was not found. Please install 'script' (util-linux/bsdutils).[/red]"
+                )
+                sys.exit(1)
+
+            # Choose shell (kept for future use if we re-enable -c)
+            shell_to_run = shell_path or os.environ.get("SHELL") or "/bin/bash"
+            # Build timing file path alongside the log
+            timing_path = output_path.with_suffix(".timing")
+
+            # Detect util-linux vs BSD script variant
+            try:
+                help_out = subprocess.run(
+                    [script_path, "--help"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                ).stdout or ""
+            except Exception:
+                help_out = ""
+
+            use_util_linux_timing = "--timing" in help_out
+
+            # Start recording with timing support
+            # Launch background session monitor before starting the recorder
+            monitor = SessionMonitor(
+                log_path=output_path,
+                timing_path=timing_path,
+                session_root_dir=output_path.parent,
+                inactivity_seconds=15 * 60,
+                max_lines_per_segment=1000,
+            )
+            monitor.start()
+            if use_util_linux_timing:
+                # util-linux: prefer -T/--log-timing FILE; run interactive default shell
+                base = [script_path, "-q"]
+                if flush:
+                    base.append("-f")
+                cmd = base + ["-T", str(timing_path), str(output_path)]
+                console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                proc = subprocess.Popen(cmd)
+                proc.wait()
+                if proc.returncode != 0:
+                    raise RuntimeError(f"script exited with code {proc.returncode}")
+            else:
+                # BSD: use '-t 0' (timing to stderr) and redirect stderr to timing file
+                base = [script_path, "-q"]
+                if flush:
+                    base.append("-f")
+                cmd = base + ["-t", "0", str(output_path)]
+                console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                with open(timing_path, "wb") as timing_fp:
+                    proc = subprocess.Popen(cmd, stderr=timing_fp)
+                    proc.wait()
+                if proc.returncode != 0:
+                    raise RuntimeError(f"script exited with code {proc.returncode}")
+            # Stop monitor and compact files after recording ends
+            try:
+                monitor.stop()
+                monitor.join(timeout=10)
+                monitor.compact_original_files()
+            except Exception as e:
+                logger.warning(f"Session monitor cleanup failed: {e}")
+
+            console.print(f"[green]✓[/green] Timing saved to: {timing_path}")
+        else:
+            # Native Windows fallback: PowerShell transcription
+            powershell = shutil.which("powershell") or shutil.which("pwsh")
+            if not powershell:
+                console.print("[red]PowerShell not found. Cannot record on Windows.[/red]")
+                sys.exit(1)
+
+            # Build transcription command: open a new interactive PowerShell that transcribes
+            transcript_cmd = (
+                f"Start-Transcript -Path '{str(output_path)}' -IncludeInvocationHeader;"
+                f" Write-Host 'Recording started. Type exit to finish.';"
+                f" {shell_path or 'powershell'};"
+                f" Stop-Transcript"
+            )
+            cmd = [powershell, "-NoProfile", "-Command", transcript_cmd]
+            proc = subprocess.Popen(cmd)
+            proc.wait()
+            if proc.returncode != 0:
+                raise RuntimeError(f"PowerShell exited with code {proc.returncode}")
+
+        console.print(f"[green]✓[/green] Session saved to: {output_path}")
+        if not is_windows:
+            console.print("[dim]Tip: Replay with 'scriptreplay' using the .timing file.[/dim]")
+        else:
+            console.print("[dim]Note: PowerShell transcripts include timestamps but not scriptreplay timing.[/dim]")
+
+    except Exception as e:
+        logger.error(f"record command failed: {e}")
+        console.print(f"[red]Error:[/red] {e}")
 
 @cli.command()
 @click.argument("sre_files", nargs=-1, required=True, type=click.Path(exists=True))

@@ -8,6 +8,9 @@ import json
 from typing import Any, Dict, List, Optional, Union, TypeVar, Callable
 from pathlib import Path
 from datetime import datetime
+import os
+import platform
+import uuid
 from functools import wraps
 import hashlib
 
@@ -376,8 +379,132 @@ def clean_terminal_log(log_content: str) -> str:
         content = content.strip()
         if content:
             cleaned_lines.append(content)
-    print('\n'.join(cleaned_lines))
     return '\n'.join(cleaned_lines)
+
+
+def is_wsl() -> bool:
+    """
+    Detect if running inside Windows Subsystem for Linux.
+
+    Returns:
+        True if in WSL, False otherwise
+    """
+    try:
+        return "microsoft" in platform.release().lower()
+    except Exception:
+        return False
+
+
+def get_app_data_dir(app_name: str = "InnerBoard") -> Path:
+    """
+    Get the appropriate per-user application data directory for the OS.
+
+    On Windows: %LOCALAPPDATA%\\{app_name}
+    On macOS: ~/Library/Application Support/{app_name}
+    On Linux: $XDG_DATA_HOME/{app_name} or ~/.local/share/{app_name}
+
+    Args:
+        app_name: Name of the application folder
+
+    Returns:
+        Path to the app data directory
+    """
+    if os.name == "nt":
+        base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+        if not base:
+            base = str(Path.home() / "AppData" / "Local")
+        return Path(base) / app_name
+
+    # POSIX: macOS or Linux/WSL
+    system = platform.system().lower()
+    if system == "darwin":
+        base_path = Path.home() / "Library" / "Application Support"
+    else:
+        # Linux and WSL
+        base_path = Path(os.getenv("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+    return base_path / app_name
+
+
+def get_sessions_dir(app_name: str = "InnerBoard") -> Path:
+    """
+    Get (and ensure) the sessions directory under the app data directory.
+
+    Args:
+        app_name: Application name
+
+    Returns:
+        Path to the ensured sessions directory
+    """
+    return ensure_directory(get_app_data_dir(app_name) / "sessions")
+
+
+def generate_session_filename(
+    session_hint: Optional[str] = None, extension: str = "log"
+) -> str:
+    """
+    Generate a unique, human-friendly session filename.
+
+    Format: session_YYYYmmdd_HHMMSS_[hint]_[shortid].ext
+
+    Args:
+        session_hint: Optional hint like tty name or shell
+        extension: File extension (without dot)
+
+    Returns:
+        Filename string
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    short_id = uuid.uuid4().hex[:8]
+    hint = session_hint or _detect_session_hint()
+    parts: List[str] = ["session", timestamp]
+    if hint:
+        parts.append(hint)
+    parts.append(short_id)
+    base = "_".join(parts)
+    filename = f"{base}.{extension.strip('.')}"
+    return sanitize_filename(filename)
+
+
+def _detect_session_hint() -> str:
+    """Best-effort detection of a useful session hint for filenames."""
+    # Try tty name
+    try:
+        tty = os.ttyname(0)
+        if tty:
+            return Path(tty).name
+    except Exception:
+        pass
+
+    # Environment hints
+    for env_key in ("TERM_SESSION_ID", "SESSIONNAME", "SHELL", "WSL_DISTRO_NAME"):
+        val = os.getenv(env_key)
+        if val:
+            return Path(str(val)).name
+
+    # Process ID fallback
+    try:
+        return f"pid{os.getpid()}"
+    except Exception:
+        return "session"
+
+
+def build_unique_session_path(
+    base_dir: Optional[Union[str, Path]] = None,
+    extension: str = "log",
+) -> Path:
+    """
+    Build a unique full path for a new session log file in the sessions dir.
+
+    Args:
+        base_dir: Optional base directory; defaults to app's sessions dir
+        extension: File extension for the log file
+
+    Returns:
+        Path to a non-existing file suitable for saving the session log
+    """
+    sessions_dir = ensure_directory(base_dir or get_sessions_dir())
+    filename = generate_session_filename(extension=extension)
+    return sessions_dir / filename
 
 
 def main():

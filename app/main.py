@@ -4,14 +4,11 @@ The main command-line interface for the InnerBoard-local agent.
 
 import argparse
 from app.storage import EncryptedVault, load_key, DB_FILE
-from app.llm import LocalLLM
-from app.advice import AdviceService
-from app.safety import no_network
 import sys
 
 
 def handle_add(args, vault: EncryptedVault):
-    """Handles adding console activity and generating meeting prep."""
+    """Handles adding console activity to the vault only."""
     console_text = args.text
     if not console_text:
         print("Error: The --text argument is required for the 'add' command.")
@@ -21,36 +18,7 @@ def handle_add(args, vault: EncryptedVault):
     reflection_id = vault.add_reflection(console_text)
     print(f"Entry saved with ID: {reflection_id}")
 
-    print("\nInitializing local AI models (this may take a moment)...")
-    try:
-        llm = LocalLLM()
-        with no_network(allow_loopback=True, allowed_ports=(11434,)):
-            print("Model loaded. Running analysis offline...")
-            service = AdviceService(llm)
-
-            print("Extracting console session insights...")
-            sessions = service.get_console_insights(console_text)
-
-            print("Composing meeting prep...")
-            prep = service.get_meeting_prep(sessions)
-
-            print("\n--- Meeting Prep ---")
-            if prep.team_update:
-                print("\nTeam Update:")
-                for item in prep.team_update:
-                    print(f"• {item}")
-            if prep.manager_update:
-                print("\nManager Update:")
-                for item in prep.manager_update:
-                    print(f"• {item}")
-            if prep.recommendations:
-                print("\nRecommendations:")
-                for item in prep.recommendations:
-                    print(f"• {item}")
-
-    except Exception as e:
-        print(f"\nAn error occurred during AI processing: {e}", file=sys.stderr)
-        print("The entry was saved, but meeting prep could not be generated.", file=sys.stderr)
+    # Legacy CLI now only stores reflections; no AI/LLM processing here.
 
 
 def handle_list(args, vault: EncryptedVault):
