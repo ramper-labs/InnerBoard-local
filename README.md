@@ -1,20 +1,18 @@
 # InnerBoard-local
 
-**A 100% offline onboarding reflection coach that turns private journaling into structured signals and concrete micro-advice.**
+**A 100% offline meeting prep assistant that turns your console history into team/manager-ready updates.**
 
-InnerBoard-local is designed for new hires who want to reflect privately on their onboarding experience while getting actionable advice. Everything runs locally on your machine—no data ever leaves your device.
+InnerBoard-local analyzes your terminal sessions and produces concise, professional talking points for your next standup or 1:1. Everything runs locally on your machine—no data ever leaves your device.
 
 [![PyPI version](https://badge.fury.io/py/innerboard-local.svg)](https://badge.fury.io/py/innerboard-local)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## 🎯 What It Does
 
-- **Private Reflection**: Write honest reflections about your onboarding experience
-- **Console Activity Analysis**: Process terminal logs to extract structured insights
-- **Meeting Prep Generation**: Transform session data into professional team/manager updates
-- **Structured Analysis**: AI extracts key points, blockers, and confidence changes from your text
-- **Actionable Advice**: Get specific steps and checklists tailored to your situation
-- **Zero Egress**: All processing happens offline with encrypted local storage
+- **Record Console Sessions**: Capture interactive terminal activity with timing
+- **Extract Insights (SRE)**: Turn raw logs into structured successes, blockers, and resources
+- **Compose Meeting Prep (MAC)**: Generate team/manager updates and concrete recommendations
+- **100% Local**: Uses local LLMs (Ollama); no data leaves your device
 - **Modern CLI**: Beautiful terminal interface with progress indicators and rich formatting
 
 ## 🏗️ Architecture
@@ -79,9 +77,9 @@ InnerBoard-local is designed for new hires who want to reflect privately on thei
 - **Validation**: Configuration validation with helpful error messages
 - **Runtime Updates**: Configuration changes take effect immediately
 
-## 🚀 **New User Onboarding Guide**
+## 🚀 **Getting Started**
 
-Welcome to InnerBoard-local! This comprehensive guide will walk you through every step of getting started with your private onboarding reflection coach. Follow these steps in order for the best experience.
+Welcome to InnerBoard-local! This guide walks you through installation, recording console sessions, optional private notes, and generating meeting prep.
 
 ---
 
@@ -182,67 +180,60 @@ export OLLAMA_MODEL="llama3.1"
 
 ---
 
-## **🔐 Step 4: Initialize Your Encrypted Vault**
+## **🕹️ Step 4: Record a Console Session**
 
-### **Create Your Secure Storage**
+Use the built-in recorder to capture an interactive shell session. By default, writes are flushed frequently for near-real-time updates; you can disable with `--no-flush`.
 
 ```bash
-# Initialize your vault (you'll be prompted for a password)
-innerboard init
+# Start recording (type `exit` to finish)
+innerboard record
 
-# Expected output:
-# ╭──────────────────────────────────────────╮
-# │ InnerBoard-local                         │
-# │ Your private onboarding reflection coach │
-# ╰──────────────────────────────────────────╯
-#
-# Password: [enter your secure password]
-# Repeat for confirmation: [re-enter password]
-#
-# ✅ Encryption key generated and saved
-# ✅ Vault encryption test passed
-# ✅ Encrypted vault created: vault.db
-#
-# 🎉 Setup Complete!
-# You can now start adding reflections with:
-#   innerboard add "Your reflection here"
+# Useful options
+# --dir PATH      Save session under a custom directory
+# --name NAME     Filename (auto-generated if omitted)
+# --shell PATH    Shell to launch (defaults to $SHELL or /bin/bash)
+# --flush/--no-flush  Control write flushing (default: --flush)
 ```
 
-### **Password Best Practices**
-
-- **Use a strong password** (12+ characters, mix of letters, numbers, symbols)
-- **Remember it!** You'll need it every time you access your reflections
-- **Alternative**: Set environment variable to avoid repeated prompts:
-  ```bash
-  export INNERBOARD_KEY_PASSWORD="your_secure_password_here"
-  ```
-
-### **What Just Happened**
-
-✅ **Master Key Generated**: A cryptographically secure key using PBKDF2 derivation
-✅ **Vault Created**: Encrypted SQLite database (`vault.db`)
-✅ **Key Stored**: Encrypted key file (`vault.key`) with integrity protection
-✅ **Security Verified**: Test encryption/decryption cycle completed
+Session artifacts (raw log, timing, segments, SRE JSON) are saved under your app data directory, e.g. `~/.local/share/InnerBoard/sessions/` on Linux/WSL.
 
 ---
 
-## **✍️ Step 5: Write Your First Reflection**
+## **🗣️ Step 5: Generate Meeting Prep**
 
-### **Add a Reflection**
+Aggregate all recorded sessions and produce crisp talking points.
 
 ```bash
-# Write your first reflection
-innerboard add "Today was my first week at the new job. I'm learning about microservices architecture and cloud deployment. It's challenging but I'm excited to grow my skills."
+# Generate concise meeting prep
+innerboard prep
 
-# Or with environment variable (no password prompt needed):
-INNERBOARD_KEY_PASSWORD="your_password" innerboard add "I'm struggling with the new authentication service. The documentation seems outdated and I can't get JWT validation working. Been stuck for hours."
+# Include detailed SRE insights (verbose)
+innerboard prep --show-sre
 ```
 
+---
+
+## **✍️ Optional: Save a Private Note**
+
+### **Initialize Vault and Add a Note**
+
+```bash
+# One-time: create your encrypted vault for notes (password prompt)
+innerboard init
+
+# Optional: avoid prompts by exporting your password
+export INNERBOARD_KEY_PASSWORD="your_secure_password_here"
+```
+
+```bash
+# Save a short private note alongside your sessions to remind your future self
+innerboard add "Investigated auth token validation; planning staging tests next."
+```
 ### **What Happens During Processing**
 
 1. **Input Validation**: Checks for security issues (SQL injection, XSS, etc.)
-2. **Encryption**: Your reflection is encrypted before storage
-3. **AI Analysis**: (Optional) Extracts structured insights and generates advice
+2. **Encryption**: Your note is encrypted before storage
+3. **AI Analysis**: Used when generating meeting prep
 4. **Storage**: Saves encrypted data with integrity checksums
 5. **Display**: Shows summary and any generated advice
 
@@ -264,12 +255,12 @@ INNERBOARD_KEY_PASSWORD="your_password" innerboard add "I'm struggling with the 
 
 ---
 
-## **📖 Step 6: View and Manage Your Reflections**
+## **📖 View and Manage Your Notes**
 
 ### **List All Reflections**
 
 ```bash
-# View all your reflections
+# View your saved notes (separate from recorded sessions)
 innerboard list
 
 # Expected output:
@@ -303,7 +294,7 @@ innerboard status
 
 ---
 
-## **⚙️ Step 7: Customize Your Experience**
+## **⚙️ Customize Your Experience**
 
 ### **Environment Variables**
 
@@ -349,25 +340,11 @@ innerboard models
 
 ---
 
-## **🔧 Step 8: Daily Workflow**
+## **🔧 Suggested Workflow**
 
-### **Morning Reflection**
-```bash
-# Start your day with reflection
-innerboard add "Today I need to focus on understanding the codebase structure. Yesterday's blockers around the authentication flow are still unclear."
-```
-
-### **Throughout the Day**
-```bash
-# Add reflections as needed
-innerboard add "Just had a breakthrough with the JWT implementation! The senior engineer showed me the right pattern."
-```
-
-### **End of Day Review**
-```bash
-# Review your progress
-innerboard list
-```
+1) Record meaningful work sessions: `innerboard record`
+2) Optionally jot private notes to remind yourself: `innerboard add "Short note"`
+3) Generate prep before standup/1:1: `innerboard prep --show-sre`
 
 ---
 
@@ -434,20 +411,13 @@ innerboard list --help
 
 ## **🎯 Next Steps**
 
-### **Week 1: Getting Comfortable**
-- Write 1-2 reflections per day
-- Focus on technical and social onboarding challenges
-- Review your reflections weekly
+### **Before Standup / 1:1**
+- Run `innerboard prep` for concise talking points
+- Use `--show-sre` to include detailed context when needed
 
-### **Week 2: Deepening Insights**
-- Experiment with different reflection styles
-- Note patterns in your blockers
-- Use the AI suggestions for improvement
-
-### **Ongoing: Building Habits**
-- Make reflection part of your daily routine
-- Track your confidence changes over time
-- Use insights to guide your learning path
+### **Weekly Review**
+- Skim SRE session summaries to spot patterns
+- Capture follow-ups as private notes with `innerboard add "..."`
 
 ---
 
@@ -455,9 +425,11 @@ innerboard list --help
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `innerboard init` | Setup encrypted vault | `innerboard init` |
-| `innerboard add "text"` | Add reflection | `innerboard add "Struggling with..."` |
-| `innerboard list` | View all reflections | `innerboard list` |
+| `innerboard record` | Record terminal session (with timing) | `innerboard record --name standup` |
+| `innerboard prep` | Generate meeting prep from sessions | `innerboard prep --show-sre` |
+| `innerboard init` | Setup encrypted vault (for private notes) | `innerboard init` |
+| `innerboard add "text"` | Add private note (encrypted) | `innerboard add "Investigated auth tokens"` |
+| `innerboard list` | View saved notes | `innerboard list` |
 | `innerboard status` | Vault health check | `innerboard status` |
 | `innerboard models` | Available AI models | `innerboard models` |
 
@@ -626,7 +598,7 @@ make ci
 | **Total** | 50 tests | ✅ All passing |
 
 ### Manual Testing Verified
-- ✅ Complete user onboarding flow
+- ✅ First-run setup and recording flow
 - ✅ AI analysis with real Ollama models
 - ✅ Security validation (blocks SQL injection, XSS)
 - ✅ Configuration file loading
@@ -784,10 +756,10 @@ make demo          # Run demo reflection
 
 ## 🎯 Use Cases
 
-- **New Employee Onboarding**: Daily reflection and guidance
-- **Skill Development**: Track learning progress and blockers  
-- **Team Integration**: Identify social and technical challenges
-- **Process Improvement**: Structured feedback for onboarding programs
+- **Standups and 1:1s**: Fast, focused updates for your team and manager
+- **Release/Iteration Reviews**: Summarize what changed and what’s next
+- **Incident/Debugging Recaps**: Capture steps taken, blockers, and follow-ups
+- **Planning Prep**: Translate console work into clear next actions
 
 ## ✨ Production-Ready Enhancements
 
@@ -846,7 +818,7 @@ This version represents a complete production-ready implementation with enterpri
 - **Error Handling**: Comprehensive custom exception hierarchy
 - **Code Quality**: Black formatting, flake8 linting, mypy type checking
 - **Development Tools**: Makefile automation, pre-commit hooks, CI pipeline
-- **Documentation**: Comprehensive README with step-by-step onboarding
+- **Documentation**: Comprehensive README with step-by-step workflows
 
 ### 📊 **Verified Production Metrics**
 - **Security**: Blocks 100% of tested attack vectors (SQL injection, XSS, path traversal)
@@ -862,7 +834,7 @@ This version represents a complete production-ready implementation with enterpri
 This implementation has been thoroughly tested and validated through comprehensive testing:
 
 ### ✅ **Complete User Journey Testing**
-- **Onboarding Flow**: Step-by-step user setup and initial configuration
+- **First-Run Flow**: Step-by-step setup and initial configuration
 - **Daily Usage**: Adding reflections, viewing analysis, managing data
 - **Configuration**: Environment variables, .env files, model switching
 - **Error Scenarios**: Invalid inputs, missing models, network issues
@@ -907,7 +879,7 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 ## 🙏 Acknowledgments
 
 - Powered by [Ollama](https://github.com/ollama/ollama) for local model serving
-- Inspired by the need for private, offline onboarding support
+- Inspired by the need for private, offline meeting preparation
 - Built with [Click](https://click.palletsprojects.com/) for CLI, [Rich](https://rich.readthedocs.io/) for UI, [Cryptography](https://cryptography.io/) for security
 
 ---
@@ -955,15 +927,11 @@ innerboard list
 ### Console Activity Analysis Pipeline
 
 ```bash
-# Log console activity
-script terminal_session.txt
-```
+# 1) Record an interactive session (type `exit` to finish)
+innerboard record --name standup_prep
 
-After the session, run:
-
-```bash
-# Direct console-to-meeting-prep
-innerboard prep "kubectl get pods && git status"
+# 2) Generate meeting prep from all recorded sessions
+innerboard prep --show-sre
 ```
 
 ### Multi-Session Meeting Prep
@@ -990,7 +958,8 @@ innerboard prep --show-sre
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `innerboard prep "CONSOLE_TEXT"` | Direct console text to meeting prep | `innerboard prep "kubectl get pods; git status"` |
+| `innerboard record` | Record interactive terminal session | `innerboard record --name standup` |
+| `innerboard prep` | Generate meeting prep from sessions | `innerboard prep --show-sre` |
 
 ### Options and Flags
 
@@ -1090,4 +1059,4 @@ e4f5g6h Update user service endpoints
 - 🗣️ Meeting prep with team/manager updates and recommendations
 - 🚀 Beautiful Rich terminal formatting with tables and panels
 
-**Your private onboarding companion that stays on your device.** ✨
+**Your offline meeting prep companion that stays on your device.** ✨
