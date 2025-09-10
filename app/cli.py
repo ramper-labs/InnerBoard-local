@@ -30,7 +30,6 @@ from app.security import SecureKeyManager
 from app.utils import (
     format_timestamp,
     format_reflection_preview,
-    clean_terminal_log,
     get_sessions_dir,
     build_unique_session_path,
 )
@@ -216,65 +215,7 @@ def list_reflections(ctx: click.Context, limit: int):
             vault.close()
 
 
-@cli.command()
-@click.argument("reflection_id", type=int)
-@click.pass_context
-def show(ctx: click.Context, reflection_id: int):
-    """Show a specific reflection and its advice.
-
-    REFLECTION_ID: The ID of the reflection to show.
-    """
-    db_path = ctx.obj["db_path"]
-    key_path = ctx.obj["key_path"]
-
-    try:
-        # Check if vault is initialized
-        if not key_path.exists():
-            console.print("[red]No encryption key found![/red]")
-            console.print(
-                "[yellow]Run 'innerboard init' first to set up your vault.[/yellow]"
-            )
-            sys.exit(1)
-
-        # Load encryption key (with password from env if available)
-        password = os.getenv("INNERBOARD_KEY_PASSWORD")
-        with console.status("[bold green]Loading encryption key..."):
-            key = load_key(password)
-
-        # Initialize vault
-        vault = EncryptedVault(db_path, key)
-
-        # Get specific reflection
-        reflection = vault.get_reflection(reflection_id)
-
-        if not reflection:
-            console.print(f"[red]Reflection with ID {reflection_id} not found.[/red]")
-            sys.exit(1)
-
-        text, created_at, updated_at = reflection
-
-        # Display reflection
-        console.print(f"\n[bold]Reflection #{reflection_id}[/bold] ({created_at})")
-        console.print(Panel.fit(text, title="Reflection Text"))
-
-        # Note: Analysis data would need to be stored separately in future versions
-        console.print(
-            "[yellow]Analysis display not yet implemented for this version.[/yellow]"
-        )
-        console.print(
-            "[dim]Future versions will include stored analysis results.[/dim]"
-        )
-
-    except InnerBoardError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        console.print(f"[red]Unexpected error:[/red] {e}")
-        sys.exit(1)
-    finally:
-        if "vault" in locals():
-            vault.close()
+ 
 
 
 @cli.command()
@@ -670,37 +611,6 @@ def prep(ctx: click.Context, model: Optional[str], show_sre: bool):
 
 
 @cli.command()
-@click.argument("log_file", type=click.Path(exists=True))
-@click.option("--model", help="Override the default Ollama model")
-@click.option("--output", type=click.Path(), help="Path to save the JSON output")
-@click.pass_context
-def process_log(ctx: click.Context, log_file: str, model: Optional[str], output: Optional[str]):
-    """Process terminal log file and generate SRE_output.json format."""
-    try:
-        # Read log file
-        with open(log_file, 'r') as f:
-            log_content = f.read()
-        # Clean the log
-        cleaned_text = clean_terminal_log(log_content)
-        with console.status("[bold green]Initializing AI model..."):
-            llm = LocalLLM(model=model if model else config.ollama_model)
-        service = AdviceService(llm)
-        with no_network():
-            sessions = service.get_console_insights(cleaned_text)
-        # Convert to JSON
-        json_data = json.dumps([s.model_dump() for s in sessions], indent=2)
-        if output:
-            with open(output, 'w') as f:
-                f.write(json_data)
-            console.print(f"[green]✓[/green] Output saved to {output}")
-        else:
-            console.print(json_data)
-    except Exception as e:
-        logger.error(f"process_log command failed: {e}")
-        console.print(f"[red]Error:[/red] {e}")
-
-
-@cli.command()
 @click.option(
     "--dir",
     "output_dir",
@@ -858,82 +768,7 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
         logger.error(f"record command failed: {e}")
         console.print(f"[red]Error:[/red] {e}")
 
-@cli.command()
-@click.argument("sre_files", nargs=-1, required=True, type=click.Path(exists=True))
-@click.option("--model", help="Override the default Ollama model")
-@click.option("--output", type=click.Path(), help="Path to save the MAC JSON output")
-@click.pass_context
-def generate_mac(ctx: click.Context, sre_files: tuple, model: Optional[str], output: Optional[str]):
-    """Generate Meeting Advice Composer (MAC) output from SRE session JSON files.
-    
-    SRE_FILES: One or more SRE session JSON files to process.
-    
-    Example:
-        innerboard generate-mac config_jsons/SRE_output1.json config_jsons/SRE_output2.json --output config_jsons/MAC_output.json
-    """
-    try:
-        # Read and combine all SRE session files
-        all_sessions = []
-        for sre_file in sre_files:
-            console.print(f"[dim]Reading {sre_file}...[/dim]")
-            with open(sre_file, 'r') as f:
-                sessions_data = json.load(f)
-                if isinstance(sessions_data, list):
-                    all_sessions.extend(sessions_data)
-                else:
-                    all_sessions.append(sessions_data)
-        
-        if not all_sessions:
-            console.print("[yellow]No sessions found in the provided files.[/yellow]")
-            return
-        
-        console.print(f"[dim]Loaded {len(all_sessions)} sessions from {len(sre_files)} file(s)[/dim]")
-        
-        # Initialize LLM and service
-        with console.status("[bold green]Initializing AI model..."):
-            llm = LocalLLM(model=model if model else config.ollama_model)
-        service = AdviceService(llm)
-        
-        # Convert sessions data to SRESession objects for validation
-        validated_sessions = []
-        for session_data in all_sessions:
-            try:
-                validated_sessions.append(SRESession(**session_data))
-            except Exception as e:
-                logger.warning(f"Skipping invalid session data: {e}")
-                continue
-        
-        if not validated_sessions:
-            console.print("[red]No valid sessions found in the provided files.[/red]")
-            return
-        
-        # Generate MAC output
-        with console.status("[bold green]Generating meeting prep..."):
-            with no_network():
-                mac_output = service.get_meeting_prep(validated_sessions)
-        
-        # Convert to JSON
-        mac_json = mac_output.model_dump_json(indent=2)
-        
-        if output:
-            with open(output, 'w') as f:
-                f.write(mac_json)
-            console.print(f"[green]✓[/green] MAC output saved to {output}")
-        else:
-            console.print(mac_json)
-            
-        # Display summary
-        console.print(f"\n[bold blue]📋 Meeting Prep Summary[/bold blue]")
-        if mac_output.team_update:
-            console.print(f"[green]Team Updates:[/green] {len(mac_output.team_update)} items")
-        if mac_output.manager_update:
-            console.print(f"[blue]Manager Updates:[/blue] {len(mac_output.manager_update)} items")
-        if mac_output.recommendations:
-            console.print(f"[yellow]Recommendations:[/yellow] {len(mac_output.recommendations)} items")
-            
-    except Exception as e:
-        logger.error(f"generate_mac command failed: {e}")
-        console.print(f"[red]Error:[/red] {e}")
+ 
 
 
 if __name__ == "__main__":

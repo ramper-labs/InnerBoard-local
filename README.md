@@ -282,21 +282,7 @@ innerboard list
 # └────┴──────────────────────────────────────────────────────────────────────────────────┴─────────────────────┘
 ```
 
-### **View Detailed Reflection**
 
-```bash
-# See full details of a specific reflection
-innerboard show 2
-
-# Expected output:
-# Reflection #2 (2025-08-29 06:40:32)
-# ╭────────────────────────────────────────────── Reflection Text ───────────────────────────────────────────────╮
-# │ Today was my first week at the new job. I'm learning about microservices architecture and cloud deployment.  │
-# │ It's challenging but I'm excited to grow my skills.                                                          │
-# ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-# Analysis display not yet implemented for this version.
-# Future versions will include stored analysis results.
-```
 
 ### **Check System Status**
 
@@ -381,9 +367,6 @@ innerboard add "Just had a breakthrough with the JWT implementation! The senior 
 ```bash
 # Review your progress
 innerboard list
-
-# Deep dive into specific reflections
-innerboard show 3
 ```
 
 ---
@@ -475,7 +458,6 @@ innerboard list --help
 | `innerboard init` | Setup encrypted vault | `innerboard init` |
 | `innerboard add "text"` | Add reflection | `innerboard add "Struggling with..."` |
 | `innerboard list` | View all reflections | `innerboard list` |
-| `innerboard show ID` | View specific reflection | `innerboard show 1` |
 | `innerboard status` | Vault health check | `innerboard status` |
 | `innerboard models` | Available AI models | `innerboard models` |
 
@@ -950,7 +932,6 @@ InnerBoard-local is now a **complete, production-ready application** with:
 | `innerboard init` | Initialize encrypted vault | ✅ Encryption key generated and saved<br>✅ Vault encryption test passed<br>🎉 Setup Complete! |
 | `innerboard add "text"` | Add reflection with AI analysis | ✓ Reflection saved with ID: 1<br>📊 Structured Analysis<br>🎯 Actionable Advice |
 | `innerboard list` | View all reflections | Table with ID, Preview, Timestamp |
-| `innerboard show 1` | Detailed reflection view | Full text + analysis display |
 | `innerboard status` | System health check | Key file: ✓<br>Vault file: ✓<br>Total reflections: X |
 | `innerboard models` | Available AI models | gpt-oss:20b<br>Current model: gpt-oss:20b |
 | `innerboard clear --force` | Clear all data | ✓ Vault cleared: vault.db |
@@ -969,7 +950,6 @@ innerboard add "Made progress on JWT validation but stuck on refresh token handl
 
 # End of day review
 innerboard list
-innerboard show 2
 ```
 
 ### Console Activity Analysis Pipeline
@@ -982,12 +962,6 @@ script terminal_session.txt
 After the session, run:
 
 ```bash
-# Process terminal session
-innerboard process-log terminal_session.txt --output sre_session.json
-
-# Generate meeting prep
-innerboard generate-mac sre_session.json --output meeting_prep.json
-
 # Direct console-to-meeting-prep
 innerboard prep "kubectl get pods && git status"
 ```
@@ -995,12 +969,8 @@ innerboard prep "kubectl get pods && git status"
 ### Multi-Session Meeting Prep
 
 ```bash
-# Process multiple sessions
-innerboard process-log monday.txt --output monday_sre.json
-innerboard process-log tuesday.txt --output tuesday_sre.json
-
-# Generate comprehensive meeting prep
-innerboard generate-mac monday_sre.json tuesday_sre.json --output weekly_prep.json
+# Generate comprehensive meeting prep from stored sessions
+innerboard prep --show-sre
 ```
 
 ## 📋 Complete Command Reference
@@ -1012,7 +982,6 @@ innerboard generate-mac monday_sre.json tuesday_sre.json --output weekly_prep.js
 | `innerboard init` | Initialize encrypted vault | `innerboard init` |
 | `innerboard add "text"` | Add reflection with AI analysis | `innerboard add "Struggling with authentication..."` |
 | `innerboard list` | View all reflections | `innerboard list --limit 20` |
-| `innerboard show ID` | View specific reflection | `innerboard show 1` |
 | `innerboard status` | System health check | `innerboard status` |
 | `innerboard models` | Available AI models | `innerboard models` |
 | `innerboard clear` | Clear all data (with confirmation) | `innerboard clear --force` |
@@ -1021,8 +990,6 @@ innerboard generate-mac monday_sre.json tuesday_sre.json --output weekly_prep.js
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `innerboard process-log LOG_FILE` | Process terminal log into SRE sessions | `innerboard process-log session.txt --output sre.json` |
-| `innerboard generate-mac SRE_FILES...` | Generate meeting prep from SRE sessions | `innerboard generate-mac sre1.json sre2.json --output mac.json` |
 | `innerboard prep "CONSOLE_TEXT"` | Direct console text to meeting prep | `innerboard prep "kubectl get pods; git status"` |
 
 ### Options and Flags
