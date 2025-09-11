@@ -108,27 +108,42 @@ main() {
             rm -rf InnerBoard-local
         else
             print_info "Using existing directory"
-            cd InnerBoard-local
         fi
     fi
 
     if [[ ! -d "InnerBoard-local" ]]; then
         print_info "Cloning repository..."
-        git clone https://github.com/ramper-labs/InnerBoard-local.git
-        cd InnerBoard-local
+        if ! git clone https://github.com/ramper-labs/InnerBoard-local.git; then
+            print_error "Failed to clone repository"
+            exit 1
+        fi
         print_success "Repository cloned"
     fi
+
+    # Change to the InnerBoard-local directory
+    if [[ ! -d "InnerBoard-local" ]]; then
+        print_error "InnerBoard-local directory not found"
+        exit 1
+    fi
+
+    cd InnerBoard-local
+    print_info "Working in: $(pwd)"
 
     # Step 3: Install Python dependencies
     print_header "Step 3: Installing Dependencies"
 
-    cd InnerBoard-local
-
     # Install pip if needed
     if [[ -z "$PIP_CMD" ]]; then
         print_info "Installing pip..."
-        curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-        python3 get-pip.py --user
+        if ! curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py; then
+            print_error "Failed to download pip installer"
+            exit 1
+        fi
+        if ! python3 get-pip.py --user; then
+            print_error "Failed to install pip"
+            rm -f get-pip.py
+            exit 1
+        fi
         PIP_CMD="python3 -m pip"
         rm get-pip.py
         print_success "pip installed"
@@ -136,7 +151,12 @@ main() {
 
     # Install InnerBoard
     print_info "Installing InnerBoard-local..."
-    $PIP_CMD install -e .
+    if ! $PIP_CMD install -e .; then
+        print_error "Failed to install InnerBoard-local"
+        print_info "You may need to install dependencies manually:"
+        echo "  pip install -e ."
+        exit 1
+    fi
     print_success "InnerBoard-local installed"
 
     # Step 4: Setup Ollama
@@ -150,7 +170,11 @@ main() {
         case $OS in
             "macos")
                 if command_exists brew; then
-                    brew install ollama
+                    if ! brew install ollama; then
+                        print_error "Failed to install Ollama via Homebrew"
+                        echo "Please install Ollama manually: curl -fsSL https://ollama.com/install.sh | sh"
+                        exit 1
+                    fi
                 else
                     print_error "Homebrew not found. Please install Ollama manually:"
                     echo "  curl -fsSL https://ollama.com/install.sh | sh"
@@ -158,7 +182,10 @@ main() {
                 fi
                 ;;
             "linux")
-                curl -fsSL https://ollama.com/install.sh | sh
+                if ! curl -fsSL https://ollama.com/install.sh | sh; then
+                    print_error "Failed to install Ollama"
+                    exit 1
+                fi
                 ;;
             *)
                 print_error "Automatic Ollama installation not supported for $OS"
@@ -184,20 +211,36 @@ main() {
 
     # Pull model
     print_info "Downloading gpt-oss:20b model..."
-    ollama pull gpt-oss:20b
-    print_success "AI model downloaded"
+    if ! ollama pull gpt-oss:20b; then
+        print_warning "Failed to download AI model automatically"
+        print_info "You can download it manually later:"
+        echo "  ollama pull gpt-oss:20b"
+        echo "  innerboard setup  # Run setup to complete initialization"
+    else
+        print_success "AI model downloaded"
+    fi
 
     # Step 6: Initialize vault
     print_header "Step 6: Initializing Encrypted Vault"
 
     print_info "Setting up your secure vault..."
-    innerboard init
+    if ! innerboard init --no-interactive; then
+        print_warning "Vault initialization failed or requires manual setup"
+        print_info "You can initialize the vault manually later:"
+        echo "  innerboard init"
+    else
+        print_success "Vault initialized"
+    fi
 
     # Step 7: Verify setup
     print_header "Step 7: Verifying Setup"
 
     print_info "Testing installation..."
-    innerboard status
+    if ! innerboard status; then
+        print_warning "Status check failed"
+        print_info "Setup may be incomplete. You can check status manually:"
+        echo "  innerboard status"
+    fi
 
     # Success!
     print_header "🎉 Setup Complete!"
