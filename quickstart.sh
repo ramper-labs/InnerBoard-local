@@ -89,12 +89,47 @@ done
 say "Pulling default model (gpt-oss:20b)"
 ollama pull gpt-oss:20b || warn "Model pull failed; you can retry later: ollama pull gpt-oss:20b"
 
-say "Initializing vault (you will be prompted for a password)"
-if innerboard init; then
+say "Vault password setup"
+attempts=0
+while :; do
+  attempts=$((attempts+1))
+  read -s -p "Enter vault password: " __PW1; echo
+  read -s -p "Confirm vault password: " __PW2; echo
+  if [ -z "${__PW1}" ]; then warn "Password cannot be empty"; fi
+  if [ "${__PW1}" = "${__PW2}" ] && [ -n "${__PW1}" ]; then PW="${__PW1}"; unset __PW1 __PW2; break; fi
+  if [ $attempts -ge 3 ]; then die "Passwords did not match after 3 attempts"; fi
+  warn "Passwords do not match. Try again."
+done
+
+say "Initializing vault"
+if innerboard init --password "${PW}"; then
   ok "Vault initialized"
 else
   warn "Vault init may require manual run: innerboard init"
 fi
+
+# Offer to save password
+read -r -p "Save password to .env (plaintext)? [y/N]: " __ANS || true
+case "${__ANS}" in
+  y|Y|yes|YES)
+    if [ ! -f .env ]; then
+      : > .env
+    fi
+    # Update or append INNERBOARD_KEY_PASSWORD safely (portable awk)
+    awk -v kv="INNERBOARD_KEY_PASSWORD=${PW}" '
+      BEGIN{set=0}
+      /^INNERBOARD_KEY_PASSWORD=/{print kv; set=1; next}
+      {print}
+      END{if(!set) print kv}
+    ' .env > .env.tmp && mv .env.tmp .env
+    chmod 600 .env 2>/dev/null || true
+    ok "Saved password to .env (plaintext). Consider protecting this file."
+    ;;
+  *)
+    say "Password not saved to .env"
+    ;;
+esac
+unset PW __ANS
 
 say "Running health check"
 if innerboard health --detailed; then

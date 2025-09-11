@@ -64,13 +64,53 @@ try { ollama list | Out-Null } catch { Start-Process "Ollama" -ErrorAction Silen
 Say "Pulling default model (gpt-oss:20b)"
 try { ollama pull gpt-oss:20b } catch { Warn "Model pull failed; run manually: ollama pull gpt-oss:20b" }
 
-Say "Initializing vault (you will be prompted for a password)"
+Say "Vault password setup"
+$max = 3; $try = 0
+while ($true) {
+  $try += 1
+  $pw1 = Read-Host -AsSecureString "Enter vault password"
+  $pw2 = Read-Host -AsSecureString "Confirm vault password"
+  $bstr1 = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw1)
+  $bstr2 = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw2)
+  $p1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr1)
+  $p2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr2)
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr1)
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr2)
+  if ([string]::IsNullOrEmpty($p1)) { Warn "Password cannot be empty" }
+  if ($p1 -eq $p2 -and -not [string]::IsNullOrEmpty($p1)) { $PW = $p1; break }
+  if ($try -ge $max) { Die "Passwords did not match after $max attempts" }
+  Warn "Passwords do not match. Try again."
+}
+
+Say "Initializing vault"
 try {
-  innerboard init
+  innerboard init --password "$PW"
   Ok "Vault initialized"
 } catch {
   Warn "Vault init may require manual run: innerboard init"
 }
+
+# Offer to save password to .env (plaintext)
+try {
+  $save = Read-Host "Save password to .env (plaintext)? [y/N]"
+  if ($save -match '^(y|yes)$') {
+    if (-not (Test-Path .env)) { New-Item -ItemType File -Path .env -Force | Out-Null }
+    $content = Get-Content .env -Raw -ErrorAction SilentlyContinue
+    if ($null -eq $content) { $content = "" }
+    $lines = $content -split "`n"
+    $found = $false
+    for ($i=0; $i -lt $lines.Length; $i++) {
+      if ($lines[$i] -match '^INNERBOARD_KEY_PASSWORD=') { $lines[$i] = "INNERBOARD_KEY_PASSWORD=$PW"; $found = $true }
+    }
+    if (-not $found) { $lines += "INNERBOARD_KEY_PASSWORD=$PW" }
+    ($lines -join "`n") | Set-Content .env -NoNewline
+    try { icacls .env /inheritance:r /grant:r "$env:USERNAME:(R)" | Out-Null } catch { }
+    Ok "Saved password to .env (plaintext). Consider protecting this file."
+  } else {
+    Say "Password not saved to .env"
+  }
+} catch { Warn "Could not update .env" }
+Remove-Variable PW -ErrorAction SilentlyContinue
 
 Say "Running health check"
 try {

@@ -85,12 +85,12 @@ Run one command per OS to install natively with a virtual environment and local 
 
 macOS / Linux:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh | bash
+curl -fsSL "https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh" | bash
 ```
 
 Windows (PowerShell):
 ```powershell
-iwr https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.ps1 -UseBasicParsing | iex
+iwr "https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.ps1" -UseBasicParsing | iex
 ```
 
 The script will:
@@ -102,6 +102,7 @@ The script will:
 - ✅ Run health checks
 
 During initialization you'll be prompted to set a password for your encrypted vault.
+Optionally, the quickstart can save your password to `.env` (plaintext) for convenience; you can decline if you prefer not to store it.
 
 **That's it!** You're ready to start using InnerBoard-local.
 
