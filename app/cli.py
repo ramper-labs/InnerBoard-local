@@ -1563,20 +1563,20 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
 
             console.print(f"[green]✓[/green] Timing saved to: {timing_path}")
         else:
-            # Native Windows fallback: PowerShell transcription
+            # Native Windows: Use a single interactive PowerShell with transcript
             powershell = shutil.which("powershell") or shutil.which("pwsh")
             if not powershell:
                 console.print("[red]PowerShell not found. Cannot record on Windows.[/red]")
                 sys.exit(1)
 
-            # Build transcription command: open a new interactive PowerShell that transcribes
+            # Keep the same interactive host so all commands are captured by the transcript.
+            # Auto-stop the transcript when the user exits the session.
             transcript_cmd = (
-                f"Start-Transcript -Path '{str(output_path)}' -IncludeInvocationHeader;"
-                f" Write-Host 'Recording started. Type exit to finish.';"
-                f" {shell_path or 'powershell'};"
-                f" Stop-Transcript"
+                f"Start-Transcript -Path '{str(output_path)}' -IncludeInvocationHeader; "
+                "Register-EngineEvent PowerShell.Exiting -Action { try { Stop-Transcript | Out-Null } catch {} } | Out-Null; "
+                "Write-Host 'Recording started. Type exit to finish.'"
             )
-            cmd = [powershell, "-NoProfile", "-Command", transcript_cmd]
+            cmd = [powershell, "-NoProfile", "-NoExit", "-Command", transcript_cmd]
             proc = subprocess.Popen(cmd)
             proc.wait()
             if proc.returncode != 0:
