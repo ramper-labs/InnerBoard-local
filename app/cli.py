@@ -6,7 +6,7 @@ Provides a user-friendly command-line interface with rich formatting and progres
 import sys
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Set
 import shutil
 import subprocess
 import platform
@@ -1365,6 +1365,137 @@ def _load_all_sre_sessions_from_dir(base_dir: Path) -> List[SRESession]:
     return validated
 
 
+def _find_missing_sre_targets(base_dir: Path) -> List[Path]:
+    """Find directories that contain session logs but are missing `sre.json`.
+
+    A target directory is any directory that contains either `cleaned.log` or
+    `raw.log` and does not already contain `sre.json`. This will include
+    segment directories like `.../segments/segment_0001` and any session-like
+    directories that follow the same artifact structure.
+    """
+    missing: Set[Path] = set()
+    try:
+        # Prefer cleaned.log targets first
+        for cleaned in base_dir.rglob("cleaned.log"):
+            seg_dir = cleaned.parent
+            if not (seg_dir / "sre.json").exists():
+                missing.add(seg_dir)
+        # Also consider raw.log if cleaned.log is not present
+        for raw in base_dir.rglob("raw.log"):
+            seg_dir = raw.parent
+            # If we already queued from cleaned.log, skip
+            if (seg_dir / "sre.json").exists() or (seg_dir / "cleaned.log").exists():
+                continue
+            missing.add(seg_dir)
+    except Exception as e:
+        logger.warning(f"Failed scanning for missing SRE targets under {base_dir}: {e}")
+    # Return in stable order for nicer output
+    return sorted(missing)
+
+
+def _generate_sre_for_targets(target_dirs: List[Path], service: AdviceService) -> None:
+    """Generate `sre.json` for each target directory in `target_dirs`.
+
+    Each target directory should contain either `cleaned.log` or `raw.log`.
+    The SRE JSON will be written to `sre.json` inside the directory.
+    """
+    for seg_dir in target_dirs:
+        try:
+            cleaned_log_path = seg_dir / "cleaned.log"
+            raw_log_path = seg_dir / "raw.log"
+            sre_output_path = seg_dir / "sre.json"
+
+            if cleaned_log_path.exists():
+                with cleaned_log_path.open("r", encoding="utf-8", errors="ignore") as fp:
+                    input_text = fp.read()
+            elif raw_log_path.exists():
+                with raw_log_path.open("r", encoding="utf-8", errors="ignore") as fp:
+                    raw_text = fp.read()
+                input_text = clean_terminal_log(raw_text)
+                # Best-effort write cleaned.log for consistency
+                try:
+                    with cleaned_log_path.open("w", encoding="utf-8") as cfp:
+                        cfp.write(input_text)
+                except Exception:
+                    pass
+            else:
+                logger.warning(f"Skipping {seg_dir}: no cleaned.log or raw.log present")
+                continue
+
+            with no_network():
+                sessions = service.get_console_insights(input_text)
+            sre_json = json.dumps([s.model_dump() for s in sessions], indent=2)
+            with sre_output_path.open("w", encoding="utf-8") as fp:
+                fp.write(sre_json)
+            logger.debug(f"Wrote SRE to {sre_output_path}")
+        except Exception as e:
+            logger.warning(f"Failed to generate SRE for {seg_dir}: {e}")
+
+
+def _find_unsegmented_session_logs(base_dir: Path) -> List[Path]:
+    """Find top-level session .log files that have no SREs under their session dir.
+
+    For each `<base>/<stem>.log`, we consider its session directory `<base>/<stem>`.
+    If there is no `sre.json` anywhere under that session directory, we mark the
+    log file for SRE generation.
+    """
+    candidates: List[Path] = []
+    try:
+        for log_path in base_dir.glob("*.log"):
+            if log_path.name.endswith(".timing.log"):
+                # Defensive: ignore odd names that might collide
+                continue
+            stem = log_path.stem
+            session_dir = base_dir / stem
+            if session_dir.exists():
+                try:
+                    if any(session_dir.rglob("sre.json")):
+                        continue
+                except Exception:
+                    # If scanning fails, fall through to try generating
+                    pass
+            candidates.append(log_path)
+    except Exception as e:
+        logger.warning(f"Failed scanning for unsegmented session logs under {base_dir}: {e}")
+    return candidates
+
+
+def _generate_sre_for_session_logs(log_files: List[Path], service: AdviceService) -> None:
+    """Generate SREs for top-level session logs into their session directories.
+
+    For `<base>/<stem>.log`, writes `cleaned.log` and `sre.json` to `<base>/<stem>/`.
+    """
+    for log_path in log_files:
+        try:
+            stem = log_path.stem
+            base_dir = log_path.parent
+            session_dir = base_dir / stem
+            segments_dir = session_dir / "segments"
+            # Ensure directories exist
+            segments_dir.mkdir(parents=True, exist_ok=True)
+
+            with log_path.open("r", encoding="utf-8", errors="ignore") as fp:
+                raw_text = fp.read()
+            cleaned_text = clean_terminal_log(raw_text)
+
+            cleaned_log_path = session_dir / "cleaned.log"
+            sre_output_path = session_dir / "sre.json"
+            try:
+                with cleaned_log_path.open("w", encoding="utf-8") as cfp:
+                    cfp.write(cleaned_text)
+            except Exception:
+                pass
+
+            with no_network():
+                sessions = service.get_console_insights(cleaned_text)
+            sre_json = json.dumps([s.model_dump() for s in sessions], indent=2)
+            with sre_output_path.open("w", encoding="utf-8") as fp:
+                fp.write(sre_json)
+            logger.debug(f"Wrote SRE to {sre_output_path} from {log_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to generate SRE for session log {log_path}: {e}")
+
+
 @cli.command()
 @click.option("--model", help="Override the default Ollama model")
 @click.option(
@@ -1380,8 +1511,26 @@ def prep(ctx: click.Context, model: Optional[str], show_sre: bool):
             llm = LocalLLM(model=model if model else config.ollama_model)
         service = AdviceService(llm)
 
-        # Aggregate all SRE sessions from the sessions directory
+        # Check for missing SREs and generate them before aggregating
         sessions_dir = get_sessions_dir()
+        missing_targets = _find_missing_sre_targets(sessions_dir)
+        if missing_targets:
+            console.print(
+                f"[dim]Found {len(missing_targets)} segments without SRE. Generating...[/dim]"
+            )
+            with console.status("[bold green]Generating missing SRE files...[/bold green]"):
+                _generate_sre_for_targets(missing_targets, service)
+
+        # Also generate SREs for short sessions that never created segments
+        unsegmented_logs = _find_unsegmented_session_logs(sessions_dir)
+        if unsegmented_logs:
+            console.print(
+                f"[dim]Found {len(unsegmented_logs)} short sessions without SRE. Generating...[/dim]"
+            )
+            with console.status("[bold green]Generating SRE for short sessions...[/bold green]"):
+                _generate_sre_for_session_logs(unsegmented_logs, service)
+
+        # Aggregate all SRE sessions from the sessions directory
         console.print(f"[dim]Loading SRE sessions from {sessions_dir}...[/dim]")
         sessions = _load_all_sre_sessions_from_dir(sessions_dir)
         if not sessions:
