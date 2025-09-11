@@ -64,11 +64,21 @@ try { ollama list | Out-Null } catch { Start-Process "Ollama" -ErrorAction Silen
 Say "Pulling default model (gpt-oss:20b)"
 try { ollama pull gpt-oss:20b } catch { Warn "Model pull failed; run manually: ollama pull gpt-oss:20b" }
 
-Say "Initializing vault"
-try { innerboard init --no-interactive } catch { Warn "Vault init may require manual run: innerboard init" }
+Say "Initializing vault (you will be prompted for a password)"
+try {
+  innerboard init
+  Ok "Vault initialized"
+} catch {
+  Warn "Vault init may require manual run: innerboard init"
+}
 
 Say "Running health check"
-try { innerboard health --detailed } catch { Warn "Health check reported issues" }
+try {
+  innerboard health --detailed
+  Ok "Health check passed"
+} catch {
+  Warn "Health check reported issues"
+}
 
 Ok "Setup complete!"
 Write-Host "Next steps:"; Write-Host "  .\.venv\Scripts\Activate.ps1"; Write-Host "  innerboard record"; Write-Host "  innerboard add \"My reflection\""; Write-Host "  innerboard prep --show-sre"

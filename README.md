@@ -101,6 +101,8 @@ The script will:
 - ✅ Initialize your encrypted vault
 - ✅ Run health checks
 
+During initialization you'll be prompted to set a password for your encrypted vault.
+
 **That's it!** You're ready to start using InnerBoard-local.
 
 ---

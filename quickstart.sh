@@ -89,11 +89,19 @@ done
 say "Pulling default model (gpt-oss:20b)"
 ollama pull gpt-oss:20b || warn "Model pull failed; you can retry later: ollama pull gpt-oss:20b"
 
-say "Initializing vault"
-innerboard init --no-interactive || warn "Vault init may require manual run: innerboard init"
+say "Initializing vault (you will be prompted for a password)"
+if innerboard init; then
+  ok "Vault initialized"
+else
+  warn "Vault init may require manual run: innerboard init"
+fi
 
 say "Running health check"
-innerboard health --detailed || warn "Health check reported issues"
+if innerboard health --detailed; then
+  ok "Health check passed"
+else
+  warn "Health check reported issues"
+fi
 
 echo
 ok "Setup complete!"
