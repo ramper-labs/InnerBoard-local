@@ -7,12 +7,12 @@ function Ok($msg) { Write-Host "✓ $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "! $msg" -ForegroundColor Yellow }
 function Die($msg) { Write-Host "✗ $msg" -ForegroundColor Red; exit 1 }
 
-# Determine working directory: if running from a file, use its folder; if piped (iex), stay in current location
+# Determine working directory
+# - When run from a file, $PSScriptRoot is populated
+# - When piped to iex, use the current directory
 $scriptRoot = $PSScriptRoot
-if (-not $scriptRoot) {
-  if ($MyInvocation.MyCommand.Path) { $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path } else { $scriptRoot = (Get-Location).Path }
-}
-try { Set-Location -Path $scriptRoot } catch { }
+if ([string]::IsNullOrEmpty($scriptRoot)) { $scriptRoot = (Get-Location).Path }
+Set-Location -Path $scriptRoot -ErrorAction SilentlyContinue
 
 Say "InnerBoard-local quickstart (native: Windows PowerShell)"
 
