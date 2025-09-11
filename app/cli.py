@@ -1577,7 +1577,19 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
                 "Write-Host 'Recording started. Type exit to finish.'"
             )
             cmd = [powershell, "-NoProfile", "-NoExit", "-Command", transcript_cmd]
-            proc = subprocess.Popen(cmd)
+
+            # In Windows Terminal or VS Code's terminal, Start-Transcript may miss native exe output
+            # due to ConPTY. Launch a dedicated console window to ensure full capture.
+            in_conpty_host = (
+                bool(os.environ.get("WT_SESSION"))
+                or os.environ.get("TERM_PROGRAM", "").lower() in ("vscode", "windows_terminal")
+            )
+            creationflags = 0
+            if in_conpty_host and hasattr(subprocess, "CREATE_NEW_CONSOLE"):
+                console.print("[dim]Opening a new console window to ensure native command output is captured...[/dim]")
+                creationflags = subprocess.CREATE_NEW_CONSOLE
+
+            proc = subprocess.Popen(cmd, creationflags=creationflags)
             proc.wait()
             if proc.returncode != 0:
                 raise RuntimeError(f"PowerShell exited with code {proc.returncode}")
