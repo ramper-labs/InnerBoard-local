@@ -27,6 +27,42 @@ cd "$SCRIPT_DIR"
 
 say "InnerBoard-local quickstart (native: macOS/Linux)"
 
+# Args and environment
+PW="${INNERBOARD_KEY_PASSWORD:-}"
+AUTO_YES=0
+NON_INTERACTIVE=0
+IS_TTY=0
+if [ -t 0 ] && [ -t 1 ]; then IS_TTY=1; fi
+TTY_INPUT=""
+if [ -r /dev/tty ]; then TTY_INPUT="/dev/tty"; fi
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --password=*)
+      PW="${1#*=}"
+      shift
+      ;;
+    --password)
+      shift
+      PW="${1-}"
+      [ -z "$PW" ] && die "--password requires a value"
+      shift
+      ;;
+    --yes|-y)
+      AUTO_YES=1
+      shift
+      ;;
+    --non-interactive|--ci)
+      NON_INTERACTIVE=1
+      shift
+      ;;
+    *)
+      # ignore unknown args for forward-compat
+      shift
+      ;;
+  esac
+done
+
 # Preconditions
 require_cmd python3 || true
 require_cmd git || true
@@ -102,16 +138,24 @@ say "Pulling default model (gpt-oss:20b)"
 ollama pull gpt-oss:20b || warn "Model pull failed; you can retry later: ollama pull gpt-oss:20b"
 
 say "Vault password setup"
-attempts=0
-while :; do
-  attempts=$((attempts+1))
-  read -s -p "Enter vault password: " __PW1; echo
-  read -s -p "Confirm vault password: " __PW2; echo
-  if [ -z "${__PW1}" ]; then warn "Password cannot be empty"; fi
-  if [ "${__PW1}" = "${__PW2}" ] && [ -n "${__PW1}" ]; then PW="${__PW1}"; unset __PW1 __PW2; break; fi
-  if [ $attempts -ge 3 ]; then die "Passwords did not match after 3 attempts"; fi
-  warn "Passwords do not match. Try again."
-done
+if [ -n "${PW:-}" ]; then
+  : # password provided via flag or env
+else
+  if [ -n "$TTY_INPUT" ] && [ "$NON_INTERACTIVE" -ne 1 ]; then
+    attempts=0
+    while :; do
+      attempts=$((attempts+1))
+      read -s -p "Enter vault password: " __PW1 < "$TTY_INPUT"; echo
+      read -s -p "Confirm vault password: " __PW2 < "$TTY_INPUT"; echo
+      if [ -z "${__PW1}" ]; then warn "Password cannot be empty"; fi
+      if [ "${__PW1}" = "${__PW2}" ] && [ -n "${__PW1}" ]; then PW="${__PW1}"; unset __PW1 __PW2; break; fi
+      if [ $attempts -ge 3 ]; then die "Passwords did not match after 3 attempts"; fi
+      warn "Passwords do not match. Try again."
+    done
+  else
+    die "Non-interactive run detected. Provide a password via --password or INNERBOARD_KEY_PASSWORD."
+  fi
+fi
 
 say "Initializing vault"
 if innerboard init --password "${PW}"; then
@@ -120,28 +164,33 @@ else
   warn "Vault init may require manual run: innerboard init"
 fi
 
-# Offer to save password
-read -r -p "Save password to .env (plaintext)? [y/N]: " __ANS || true
-case "${__ANS}" in
-  y|Y|yes|YES)
-    if [ ! -f .env ]; then
-      : > .env
-    fi
-    # Update or append INNERBOARD_KEY_PASSWORD safely (portable awk)
-    awk -v kv="INNERBOARD_KEY_PASSWORD=${PW}" '
-      BEGIN{set=0}
-      /^INNERBOARD_KEY_PASSWORD=/{print kv; set=1; next}
-      {print}
-      END{if(!set) print kv}
-    ' .env > .env.tmp && mv .env.tmp .env
-    chmod 600 .env 2>/dev/null || true
-    ok "Saved password to .env (plaintext). Consider protecting this file."
-    ;;
-  *)
-    say "Password not saved to .env"
-    ;;
-esac
-unset PW __ANS
+# Offer to save password (skip in non-interactive contexts)
+if [ -n "$TTY_INPUT" ] && [ "$NON_INTERACTIVE" -ne 1 ]; then
+  read -r -p "Save password to .env (plaintext)? [y/N]: " __ANS < "$TTY_INPUT" || true
+  case "${__ANS}" in
+    y|Y|yes|YES)
+      if [ ! -f .env ]; then
+        : > .env
+      fi
+      # Update or append INNERBOARD_KEY_PASSWORD safely (portable awk)
+      awk -v kv="INNERBOARD_KEY_PASSWORD=${PW}" '
+        BEGIN{set=0}
+        /^INNERBOARD_KEY_PASSWORD=/{print kv; set=1; next}
+        {print}
+        END{if(!set) print kv}
+      ' .env > .env.tmp && mv .env.tmp .env
+      chmod 600 .env 2>/dev/null || true
+      ok "Saved password to .env (plaintext). Consider protecting this file."
+      ;;
+    *)
+      say "Password not saved to .env"
+      ;;
+  esac
+  unset __ANS
+else
+  say "Skipping .env save prompt (non-interactive)."
+fi
+unset PW
 
 say "Running health check"
 if innerboard health --detailed; then
