@@ -7,13 +7,26 @@ function Ok($msg) { Write-Host "✓ $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "! $msg" -ForegroundColor Yellow }
 function Die($msg) { Write-Host "✗ $msg" -ForegroundColor Red; exit 1 }
 
-Set-Location -Path (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+# Determine working directory: if running from a file, use its folder; if piped (iex), stay in current location
+$scriptRoot = $PSScriptRoot
+if (-not $scriptRoot) {
+  if ($MyInvocation.MyCommand.Path) { $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path } else { $scriptRoot = (Get-Location).Path }
+}
+try { Set-Location -Path $scriptRoot } catch { }
 
 Say "InnerBoard-local quickstart (native: Windows PowerShell)"
 
 # Check prereqs
 if (-not (Get-Command py -ErrorAction SilentlyContinue)) { Die "Python (py) not found. Install Python 3.11+ from winget or python.org" }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Die "Git not found. Install Git from winget or git-scm.com" }
+
+# If not already in repo, clone it locally (supports iwr ... | iex usage)
+if (-not (Test-Path 'setup.py') -and -not (Test-Path 'pyproject.toml') -and -not (Test-Path 'app\cli.py')) {
+  Say "Cloning InnerBoard-local repository"
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Die "Git not found. Install Git from winget or git-scm.com" }
+  git clone https://github.com/ramper-labs/InnerBoard-local.git
+  Set-Location InnerBoard-local
+}
 
 # Ensure venv
 if (-not (Test-Path .venv)) {
