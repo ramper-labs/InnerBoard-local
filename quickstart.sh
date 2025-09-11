@@ -1,6 +1,7 @@
 #!/bin/bash
 # InnerBoard-local Quick Start Script
 # This script helps new users get up and running quickly
+# Version: 2.1 - Fixed directory navigation and error handling
 
 set -e
 
@@ -59,6 +60,8 @@ main() {
     # Detect OS
     OS=$(detect_os)
     print_info "Detected OS: $OS"
+    print_info "Current directory: $(pwd)"
+    print_info "Script running as: $(whoami)"
 
     # Step 1: Check prerequisites
     print_header "Step 1: Checking Prerequisites"
@@ -99,35 +102,77 @@ main() {
 
     # Step 2: Clone repository
     print_header "Step 2: Downloading InnerBoard-local"
+    print_info "Working directory: $(pwd)"
+    print_info "Script version: 2.1"
 
+    # Store original directory
+    ORIGINAL_DIR="$(pwd)"
+    print_info "Original directory: $ORIGINAL_DIR"
+
+    # Handle existing directory
     if [[ -d "InnerBoard-local" ]]; then
         print_warning "InnerBoard-local directory already exists"
-        read -p "Remove existing directory? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            rm -rf InnerBoard-local
+
+        # In non-interactive mode, just use existing directory
+        if [[ ! -t 0 ]]; then
+            print_info "Running non-interactively, using existing directory"
         else
-            print_info "Using existing directory"
+            echo "Contents of current directory:"
+            ls -la | head -5
+            echo
+            read -p "Remove existing directory? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Removing existing directory..."
+                rm -rf InnerBoard-local
+                print_success "Existing directory removed"
+            else
+                print_info "Using existing directory"
+            fi
         fi
     fi
 
+    # Clone if directory doesn't exist
     if [[ ! -d "InnerBoard-local" ]]; then
-        print_info "Cloning repository..."
-        if ! git clone https://github.com/ramper-labs/InnerBoard-local.git; then
-            print_error "Failed to clone repository"
+        print_info "Cloning repository from GitHub..."
+        print_info "Command: git clone https://github.com/ramper-labs/InnerBoard-local.git"
+
+        # Try git clone with verbose output
+        if git clone https://github.com/ramper-labs/InnerBoard-local.git; then
+            print_success "Repository cloned successfully"
+        else
+            print_error "Git clone failed with exit code: $?"
+            print_info "Checking git and network connectivity..."
+            git --version
+            ping -c 1 github.com || echo "Network connectivity issue"
             exit 1
         fi
-        print_success "Repository cloned"
     fi
 
-    # Change to the InnerBoard-local directory
+    # Double-check directory exists
     if [[ ! -d "InnerBoard-local" ]]; then
-        print_error "InnerBoard-local directory not found"
+        print_error "InnerBoard-local directory still doesn't exist!"
+        print_info "Current directory contents:"
+        ls -la
+        print_info "Checking permissions:"
+        touch test_file 2>/dev/null && rm test_file && echo "Write permissions OK" || echo "No write permissions"
         exit 1
     fi
 
-    cd InnerBoard-local
-    print_info "Working in: $(pwd)"
+    # Change to directory with absolute path
+    TARGET_DIR="$ORIGINAL_DIR/InnerBoard-local"
+    print_info "Changing to: $TARGET_DIR"
+
+    if cd "$TARGET_DIR"; then
+        print_success "Successfully changed to InnerBoard-local directory"
+        print_info "Now working in: $(pwd)"
+    else
+        print_error "Failed to cd to: $TARGET_DIR"
+        print_info "Checking directory details:"
+        ls -la "$ORIGINAL_DIR" | grep InnerBoard
+        stat "$TARGET_DIR" 2>/dev/null || echo "Directory not accessible"
+        exit 1
+    fi
 
     # Step 3: Install Python dependencies
     print_header "Step 3: Installing Dependencies"
