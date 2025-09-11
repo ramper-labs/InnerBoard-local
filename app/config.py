@@ -25,7 +25,7 @@ class AppConfig:
     ollama_model: str = "gpt-oss:20b"
     ollama_host: str = "http://localhost:11434"
     ollama_timeout: int = 30
-    max_tokens: int = 512
+    max_tokens: int = 100000
 
     # Model Parameters
     temperature: float = 0.7
@@ -36,7 +36,7 @@ class AppConfig:
     allowed_ports: tuple = (11434,)
 
     # Logging
-    log_level: str = "INFO"
+    log_level: str = "ERROR"
     log_file: Optional[Path] = None
 
     # Performance

@@ -216,6 +216,101 @@ def list_reflections(ctx: click.Context, limit: int):
             vault.close()
 
 
+@cli.command()
+@click.argument("reflection_id", type=int)
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def delete(ctx: click.Context, reflection_id: int, force: bool):
+    """Delete a specific reflection from the vault.
+
+    REFLECTION_ID: The ID of the reflection to delete (see 'innerboard list')
+
+    This action cannot be undone. Use --force to skip confirmation.
+    """
+    db_path = ctx.obj["db_path"]
+    key_path = ctx.obj["key_path"]
+
+    try:
+        # Check if vault is initialized
+        if not key_path.exists():
+            console.print("[red]No encryption key found![/red]")
+            console.print(
+                "[yellow]Run 'innerboard init' first to set up your vault.[/yellow]"
+            )
+            sys.exit(1)
+
+        # Load encryption key (with password from env if available)
+        password = os.getenv("INNERBOARD_KEY_PASSWORD")
+        with console.status("[bold green]Loading encryption key..."):
+            key = load_key(password)
+
+        # Initialize vault
+        vault = EncryptedVault(db_path, key)
+
+        # Check if reflection exists and show preview before deletion
+        try:
+            reflection = vault.get_reflection(reflection_id)
+            if not reflection:
+                console.print(f"[red]Reflection with ID {reflection_id} not found.[/red]")
+                return
+
+            text, created_at, updated_at = reflection
+            preview = format_reflection_preview(text)
+
+            console.print("[yellow]Reflection to delete:[/yellow]")
+            console.print(f"[cyan]ID:[/cyan] {reflection_id}")
+            console.print(f"[cyan]Created:[/cyan] {created_at}")
+            console.print(f"[cyan]Preview:[/cyan] {preview}")
+
+        except Exception:
+            console.print(f"[red]Error retrieving reflection {reflection_id}.[/red]")
+            return
+
+        # Confirmation prompt (unless --force is used)
+        if not force:
+            if not Confirm.ask(f"Are you sure you want to delete reflection {reflection_id}?"):
+                console.print("[yellow]Deletion cancelled.[/yellow]")
+                return
+
+        # Delete the reflection
+        with console.status(f"[bold red]Deleting reflection {reflection_id}..."):
+            deleted = vault.delete_reflection(reflection_id)
+
+        if deleted:
+            console.print(f"[green]✓[/green] Reflection {reflection_id} deleted successfully")
+        else:
+            console.print(f"[red]Failed to delete reflection {reflection_id}[/red]")
+
+    except InnerBoardError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        console.print(f"[red]Unexpected error:[/red] {e}")
+        sys.exit(1)
+    finally:
+        if "vault" in locals():
+            vault.close()
+
+
+# Alias for delete command
+@cli.command("del")
+@click.argument("reflection_id", type=int)
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def delete_alias(ctx: click.Context, reflection_id: int, force: bool):
+    """Alias for 'delete' command.
+
+    Delete a specific reflection from the vault.
+
+    REFLECTION_ID: The ID of the reflection to delete (see 'innerboard list')
+
+    This action cannot be undone. Use --force to skip confirmation.
+    """
+    # Call the main delete function
+    ctx.invoke(delete, reflection_id=reflection_id, force=force)
+
+
  
 
 
@@ -683,7 +778,48 @@ def _verify_setup() -> bool:
     try:
         # Test basic functionality
         key_manager = SecureKeyManager(config.key_path)
-        master_key = key_manager.load_master_key()
+
+        # Get password from environment first
+        password = os.getenv("INNERBOARD_KEY_PASSWORD")
+
+        # Try to load master key
+        master_key = None
+        password_required = False
+
+        try:
+            master_key = key_manager.load_master_key(password)
+        except Exception as e:
+            if "Password required" in str(e):
+                password_required = True
+                # If password is required but not in environment, prompt interactively
+                if not password:
+                    console.print("[yellow]🔐 Vault password required for verification[/yellow]")
+                    password = Prompt.ask(
+                        "Enter your vault password",
+                        password=True
+                    )
+                    try:
+                        master_key = key_manager.load_master_key(password)
+                    except Exception as inner_e:
+                        console.print(f"[red]❌ Invalid password: {inner_e}[/red]")
+                        return False
+                else:
+                    console.print("[red]❌ Password required but INNERBOARD_KEY_PASSWORD is incorrect[/red]")
+                    return False
+            elif not password:
+                # Try without password for unencrypted keys
+                try:
+                    master_key = key_manager.load_master_key(None)
+                except Exception:
+                    console.print("[red]❌ Could not load vault key. Vault may be corrupted.[/red]")
+                    return False
+            else:
+                console.print(f"[red]❌ Could not load vault key: {e}[/red]")
+                return False
+
+        if not master_key:
+            console.print("[red]❌ Vault verification failed: Could not load master key[/red]")
+            return False
 
         vault = EncryptedVault(str(config.db_path), master_key)
 
@@ -909,19 +1045,51 @@ def _check_vault_health(detailed: bool) -> tuple[bool, str]:
         from app.storage import EncryptedVault
 
         key_manager = SecureKeyManager(key_path)
-        master_key = key_manager.load_master_key()
+
+        # Get password from environment first
+        password = os.getenv("INNERBOARD_KEY_PASSWORD")
+
+        # Try to load master key
+        master_key = None
+
+        try:
+            master_key = key_manager.load_master_key(password)
+        except Exception as e:
+            if "Password required" in str(e) and not password:
+                # Interactive password prompt for health check
+                password = Prompt.ask(
+                    "Enter vault password for health check",
+                    password=True
+                )
+                try:
+                    master_key = key_manager.load_master_key(password)
+                except Exception as inner_e:
+                    return False, f"Invalid password: {inner_e}"
+            elif not password:
+                # Try without password for unencrypted keys
+                try:
+                    master_key = key_manager.load_master_key(None)
+                except Exception:
+                    return False, "Could not load vault key. Set INNERBOARD_KEY_PASSWORD if vault is encrypted"
+            else:
+                return False, f"Could not load vault key: {e}"
+
+        if not master_key:
+            return False, "Could not load vault key"
+
         vault = EncryptedVault(str(db_path), master_key)
 
         # Test basic operations
-        test_text = "health_check_test"
+        test_text = "health check test"
         test_id = vault.add_reflection(test_text)
         retrieved = vault.get_reflection(test_id)
 
         if retrieved and retrieved[0] == test_text:
-            vault.close()
             if detailed:
                 stats = vault.get_stats() if hasattr(vault, 'get_stats') else {}
+                vault.close()
                 return True, f"Vault operational, key: {key_path}, db: {db_path}"
+            vault.close()
             return True, "Vault is operational"
         else:
             vault.close()
@@ -963,18 +1131,18 @@ def _check_network_health(detailed: bool) -> tuple[bool, str]:
 def _check_performance_health(detailed: bool) -> tuple[bool, str]:
     """Check performance and caching systems."""
     try:
-        from app.cache import Cache
+        from app.cache import cache_manager
         from app.llm import LocalLLM
 
-        # Check cache
-        cache = Cache()
-        cache_stats = cache.get_stats()
+        # Check cache stats
+        cache_stats = cache_manager.get_stats()
 
         # Check LLM connection
         llm = LocalLLM()
 
         if detailed:
-            info = f"Cache: {cache_stats.get('entries', 0)} entries"
+            total_entries = sum(stats.get('entries', 0) for stats in cache_stats.values())
+            info = f"Cache: {total_entries} total entries across {len(cache_stats)} caches"
             if hasattr(llm, 'client'):
                 info += " | LLM client ready"
             return True, info

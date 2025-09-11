@@ -334,7 +334,7 @@ services:
     image: innerboard-local:latest
     environment:
       - LOG_LEVEL=WARNING
-      - MAX_TOKENS=1024
+      - MAX_TOKENS=100000
     volumes:
       - prod_data:/app/data
 ```

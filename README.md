@@ -101,7 +101,7 @@ This script will:
 
 ### **📦 Alternative Installation Methods**
 
-#### **Option A: Manual Installation**
+#### **Option A: Manual Installation (Recommended)**
 
 **Prerequisites:**
 - Python 3.8+ ([download here](https://python.org/downloads/))
@@ -120,7 +120,7 @@ pip install -e .
 innerboard setup
 ```
 
-#### **Option B: Docker Installation**
+#### **Option B: Docker Installation (Flaky at the moment)**
 
 ```bash
 # 1. Clone the repository
@@ -156,36 +156,12 @@ innerboard --help
 
 ---
 
-### **📋 Prerequisites (Manual Installation Only)**
-
-If you're not using the quick start script, ensure you have:
-
-**Required Software:**
-- **Python 3.8+**: Core runtime
-  ```bash
-  python3 --version  # Should show 3.8 or higher
-  ```
-
-- **Ollama**: Local AI model server
-  ```bash
-  # Install Ollama
-  curl -fsSL https://ollama.com/install.sh | sh
-
-  # Verify installation
-  ollama --version
-  ```
-
-- **Git**: Version control (for cloning)
-  ```bash
-  git --version
-  ```
-
 **System Requirements:**
 - **RAM**: 8GB minimum, 16GB recommended
 - **Storage**: 20GB free space for AI models
 - **OS**: Linux, macOS, or Windows (WSL)
 
-## **🕹️ Step 4: Record a Console Session**
+## **🕹️ Record a Console Session**
 
 Use the built-in recorder to capture an interactive shell session. By default, writes are flushed frequently for near-real-time updates; you can disable with `--no-flush`.
 
@@ -204,7 +180,7 @@ Session artifacts (raw log, timing, segments, SRE JSON) are saved under your app
 
 ---
 
-## **🗣️ Step 5: Generate Meeting Prep**
+## **🗣️ Generate Meeting Prep**
 
 Aggregate all recorded sessions and produce crisp talking points.
 
@@ -234,93 +210,77 @@ export INNERBOARD_KEY_PASSWORD="your_secure_password_here"
 # Save a short private note alongside your sessions to remind your future self
 innerboard add "Investigated auth token validation; planning staging tests next."
 ```
-### **What Happens During Processing**
+---
 
-1. **Input Validation**: Checks for security issues (SQL injection, XSS, etc.)
-2. **Encryption**: Your note is encrypted before storage
-3. **AI Analysis**: Used when generating meeting prep
-4. **Storage**: Saves encrypted data with integrity checksums
-5. **Display**: Shows summary and any generated advice
+## **🔧 Suggested Workflow**
 
-### **Expected Output**
+1) Record meaningful work sessions: `innerboard record`
+2) Optionally jot private notes to remind yourself: `innerboard add "Short note"`
+3) Generate prep before standup/1:1: `innerboard prep --show-sre`
 
-```
-✓ Reflection saved with ID: 1
-╭────────────────────────────────────────────── Reflection Text ───────────────────────────────────────────────╮
-│ Today was my first week at the new job. I'm learning about microservices architecture and cloud deployment.  │
-│ It's challenging but I'm excited to grow my skills.                                                          │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-🎯 Analysis Complete
-📊 Key Points: microservices learning, cloud deployment
-🚧 Blockers: None identified
-📈 Confidence: +0.2 (slightly increased)
-💡 Advice: Continue exploring, consider pair programming sessions
-```
+## **🎯 Next Steps**
+
+### **Before Standup / 1:1**
+- Run `innerboard prep` for concise talking points
+- Use `--show-sre` to include detailed context when needed
+
+### **Weekly Review**
+- Skim SRE session summaries to spot patterns
+- Capture follow-ups as private notes with `innerboard add "..."`
 
 ---
 
-## **📖 View and Manage Your Notes**
+## **📋 Quick Reference**
 
-### **List All Reflections**
+### **Installation & Setup**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh \| bash` | One-command installation | Quick start script |
+| `innerboard setup` | Interactive setup wizard | `innerboard setup --docker` |
+| `innerboard health` | Comprehensive health check | `innerboard health --detailed` |
+| `./docker-setup.sh` | Docker deployment setup | Automated Docker setup |
 
-```bash
-# View your saved notes (separate from recorded sessions)
-innerboard list
+### **Core Commands**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `innerboard init` | Initialize encrypted vault | `innerboard init` |
+| `innerboard add "text"` | Add private reflection | `innerboard add "Struggling with auth tokens"` |
+| `innerboard list` | View saved reflections | `innerboard list --limit 10` |
+| `innerboard delete <id>` | Delete specific reflection | `innerboard delete 5 --force` |
+| `innerboard del <id>` | Alias for delete | `innerboard del 5 --force` |
+| `innerboard clear` | Delete ALL reflections | `innerboard clear --force` |
+| `innerboard status` | Vault status and stats | `innerboard status` |
 
-# Expected output:
-#                                              Reflections (2 total)
-# ┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
-# ┃ ID ┃ Preview                                                                          ┃ Timestamp           ┃
-# ┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
-# │ 2  │ Today was my first week at the new job. I'm learning about microservices arch... │ 2025-08-29 06:40:32 │
-# │ 1  │ InnerBoard vault initialized successfully!                                       │ 2025-08-29 06:39:19 │
-# └────┴──────────────────────────────────────────────────────────────────────────────────┴─────────────────────┘
-```
+### **Session Recording & Analysis**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `innerboard record` | Record terminal session | `innerboard record --name standup` |
+| `innerboard prep` | Generate meeting prep | `innerboard prep --show-sre` |
+| `innerboard models` | List available AI models | `innerboard models` |
 
+### **Help Commands**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `innerboard --help` | Show all commands | `innerboard add --help` |
 
-
-### **Check System Status**
-
-```bash
-# Get overview of your vault
-innerboard status
-
-# Expected output:
-# InnerBoard Vault Status
-# ===============================
-# Key file:     ✓ vault.key
-# Vault file:   ✓ vault.db
-# ✓ Vault loaded successfully
-# Total reflections: 2
-# Oldest reflection: 2025-08-29 06:39:19
-# Newest reflection: 2025-08-29 06:40:32
-```
 
 ---
 
-## **⚙️ Customize Your Experience**
+## **🚨 Important Security Notes**
 
-### **Environment Variables**
+- **Your data stays local**: No information leaves your device
+- **Encryption**: All reflections are encrypted at rest
+- **Network isolation**: Only local Ollama connections allowed during processing
+- **Password protection**: Your master key is password-protected
+- **Secure deletion**: Sensitive files are overwritten before deletion
 
-```bash
-# Set your preferences
-export MAX_TOKENS="1000"                 # Longer responses
-export LOG_LEVEL="DEBUG"                 # Verbose logging
-export INNERBOARD_KEY_PASSWORD="mypassword"  # Skip password prompts
-```
 
 ### **Configuration File**
 
 ```bash
 # Create your config file
 cp env.example .env
-
-# Edit .env with your preferences:
-# OLLAMA_MODEL=llama3.1
-# MAX_TOKENS=1000
-# LOG_LEVEL=INFO
-# INNERBOARD_KEY_PASSWORD=your_secure_password
 ```
 
 ### **Available Models**
@@ -336,19 +296,10 @@ innerboard models
 # ┃ Model Name  ┃
 # ┡━━━━━━━━━━━━━┩
 # │ gpt-oss:20b │
-# │ llama3.1    │
 # └─────────────┘
 #
 # Current model: gpt-oss:20b
 ```
-
----
-
-## **🔧 Suggested Workflow**
-
-1) Record meaningful work sessions: `innerboard record`
-2) Optionally jot private notes to remind yourself: `innerboard add "Short note"`
-3) Generate prep before standup/1:1: `innerboard prep --show-sre`
 
 ---
 
@@ -447,66 +398,6 @@ innerboard list --help
 
 ---
 
-## **🎯 Next Steps**
-
-### **Before Standup / 1:1**
-- Run `innerboard prep` for concise talking points
-- Use `--show-sre` to include detailed context when needed
-
-### **Weekly Review**
-- Skim SRE session summaries to spot patterns
-- Capture follow-ups as private notes with `innerboard add "..."`
-
----
-
-## **📋 Quick Reference**
-
-### **Installation & Setup**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh \| bash` | One-command installation | Quick start script |
-| `innerboard setup` | Interactive setup wizard | `innerboard setup --docker` |
-| `innerboard health` | Comprehensive health check | `innerboard health --detailed` |
-| `./docker-setup.sh` | Docker deployment setup | Automated Docker setup |
-
-### **Core Commands**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `innerboard init` | Initialize encrypted vault | `innerboard init` |
-| `innerboard add "text"` | Add private reflection | `innerboard add "Struggling with auth tokens"` |
-| `innerboard list` | View saved reflections | `innerboard list --limit 10` |
-| `innerboard status` | Vault status and stats | `innerboard status` |
-
-### **Session Recording & Analysis**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `innerboard record` | Record terminal session | `innerboard record --name standup` |
-| `innerboard prep` | Generate meeting prep | `innerboard prep --show-sre` |
-| `innerboard models` | List available AI models | `innerboard models` |
-
-### **Management Commands**
-| Command | Description | Example |
-|---------|-------------|---------|
-| `innerboard clear` | Clear all data | `innerboard clear --force` |
-| `innerboard --help` | Show all commands | `innerboard add --help` |
-
-**Environment Variables:**
-```bash
-export OLLAMA_MODEL="llama3.1"              # AI model
-export INNERBOARD_KEY_PASSWORD="password"   # Skip password prompts
-export LOG_LEVEL="DEBUG"                    # Verbose logging
-```
-
----
-
-## **🚨 Important Security Notes**
-
-- **Your data stays local**: No information leaves your device
-- **Encryption**: All reflections are encrypted at rest
-- **Network isolation**: Only local Ollama connections allowed during processing
-- **Password protection**: Your master key is password-protected
-- **Secure deletion**: Sensitive files are overwritten before deletion
-
 **Backup your vault:**
 ```bash
 # Your encrypted data is in:
@@ -514,134 +405,6 @@ export LOG_LEVEL="DEBUG"                    # Verbose logging
 # - vault.key (encrypted master key)
 cp vault.db vault.db.backup
 cp vault.key vault.key.backup
-```
-
-## 📋 Example Output
-
-**Input:**
-> "I spent the whole day trying to get the Kubernetes ingress to route correctly. The docs are confusing and I couldn't find good examples."
-
-**SRE Output:**
-```json
-{
-  "key_points": ["Ingress routing issues", "Documentation clarity problems"],
-  "blockers": ["k8s ingress config", "missing examples"],
-  "resources_needed": ["working ingress example", "clearer documentation"],
-  "confidence_delta": -0.6
-}
-```
-
-**MAC Output:**
-```json
-{
-  "steps": [
-    "Book a 20-min session with a senior engineer familiar with k8s",
-    "Find working ingress examples in the team's repository",
-    "Create a personal reference doc with working configs"
-  ],
-  "checklist": [
-    "Session scheduled with k8s expert",
-    "Example configs collected",
-    "Personal reference created",
-    "Test deployment successful"
-  ],
-  "urgency": "medium"
-}
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-```bash
-# AI Model Configuration
-export OLLAMA_MODEL="gpt-oss:20b"           # Default AI model
-export OLLAMA_HOST="http://localhost:11434" # Ollama server URL
-export OLLAMA_TIMEOUT=120                    # Request timeout in seconds
-
-# Model Parameters
-export MAX_TOKENS=1000000                    # Maximum tokens to generate
-export MODEL_TEMPERATURE=0.7                # Sampling temperature (0.0-1.0)
-export MODEL_TOP_P=0.95                     # Top-p sampling parameter
-
-# Security & Storage
-export INNERBOARD_KEY_PASSWORD="your_password"  # Skip password prompts
-export INNERBOARD_DB_PATH="./vault.db"          # Database file location
-export INNERBOARD_KEY_PATH="./vault.key"        # Encryption key location
-
-# Performance
-export ENABLE_CACHING=true                  # Enable intelligent caching
-export CACHE_TTL_SECONDS=3600               # Cache TTL in seconds
-
-# Logging
-export LOG_LEVEL=ERROR                       # Logging level (DEBUG, INFO, WARNING, ERROR)
-```
-
-### Configuration File
-
-```bash
-# Create configuration file
-cp env.example .env
-
-# Edit .env with your preferences
-nano .env
-```
-
-Example `.env` file:
-```bash
-OLLAMA_MODEL=gpt-oss:20b
-MAX_TOKENS=1000000
-INNERBOARD_KEY_PASSWORD=your_secure_password_here
-LOG_LEVEL=INFO
-ENABLE_CACHING=true
-```
-
-## 🧪 Testing & Quality Assurance
-
-### Test Coverage
-- **✅ 50/50 tests passing** (100% pass rate)
-- **✅ Security tests**: 16/16 passing - encryption, validation, key management
-- **✅ Cache tests**: 17/17 passing - TTL, performance, statistics
-- **✅ Integration tests**: 11/11 passing - full workflow validation
-- **✅ Network safety**: 6/6 passing - connection isolation and security
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run tests with coverage report
-make test-cov
-
-# Run network safety tests
-make test-no-network
-
-# Run specific test categories
-pytest tests/test_security.py -v    # Security functionality
-pytest tests/test_cache.py -v       # Caching system
-pytest tests/test_integration.py -v # Integration tests
-
-# Run individual test files
-pytest tests/test_storage_crypto.py -v
-pytest tests/test_json_valid.py -v
-pytest tests/test_taxonomy_f1.py -v
-```
-
-### Development Testing
-
-```bash
-# Install development dependencies
-make install-dev
-
-# Run linting and type checking
-make lint
-
-# Format code with black
-make format
-
-# Run full CI pipeline (lint + test + coverage)
-make ci
 ```
 
 ### Test Coverage Areas
@@ -664,271 +427,6 @@ make ci
 - ✅ Performance optimization
 - ✅ Multi-reflection management
 
-## 📁 Project Structure
-
-```
-InnerBoard-local/
-├── app/                          # Core application modules
-│   ├── __init__.py
-│   ├── cli.py                   # Modern Click-based CLI with Rich UI
-│   ├── llm.py                   # Ollama integration with caching & connection pooling
-│   ├── advice.py                # SRE + MAC orchestration engine
-│   ├── storage.py               # Encrypted SQLite vault with integrity checks
-│   ├── safety.py                # Network isolation & security guards
-│   ├── security.py              # PBKDF2 key derivation & input validation
-│   ├── config.py                # Configuration management with .env support
-│   ├── cache.py                 # TTL caching system with thread safety
-│   ├── exceptions.py            # Custom exception hierarchy
-│   ├── logging_config.py        # Structured logging configuration
-│   └── utils.py                 # Utility functions and helpers
-├── ft/                          # Fine-tuning assets
-│   ├── __init__.py
-│   ├── cfg/                     # Configuration files
-│   ├── data/                    # Training data (gitignored)
-│   └── synth/                   # Synthetic data generation
-├── tests/                       # Comprehensive test suite (50 tests)
-│   ├── __init__.py
-│   ├── test_security.py         # Security tests (16 tests)
-│   ├── test_cache.py            # Caching tests (17 tests)
-│   ├── test_integration.py      # Integration tests (11 tests)
-│   ├── test_no_network.py       # Network safety tests (2 tests)
-│   ├── conftest.py              # Test fixtures and configuration
-│   └── pytest.ini               # Test configuration
-├── prompts/                     # AI system prompts
-│   ├── sre_system_prompt.txt    # Structured Reflection Extraction
-│   └── mac_system_prompt.txt    # Micro-Advice Composer
-├── docker-compose.yml           # Full-stack Docker deployment
-├── Dockerfile                  # Containerized application
-├── Makefile                    # Development and deployment commands
-├── setup.py                    # PyPI package configuration
-├── requirements.txt            # Python dependencies with versions
-├── env.example                 # Environment variables template
-├── TESTING_SUMMARY.md          # Comprehensive testing documentation
-├── .gitignore                  # Git ignore patterns
-├── LICENSE                     # Apache 2.0 License
-└── README.md                   # This comprehensive documentation
-```
-
-## 🔧 Advanced Usage
-
-### Custom Models
-
-Use any Ollama model by name:
-```bash
-export OLLAMA_MODEL="llama3.1"
-python -m app.main add --text "Your reflection"
-```
-
-### Batch Processing
-
-Process multiple reflections from a file:
-```bash
-while IFS= read -r line; do
-    python -m app.main add --text "$line"
-
-done < reflections.txt
-```
-
-### Debugging
-
-Enable verbose logging:
-```bash
-# Set log level
-export LOG_LEVEL=DEBUG
-
-# Or use verbose flag
-innerboard --verbose list
-
-# Ollama server logs appear in its console
-```
-
-## 🐳 Docker Deployment
-
-### Quick Start with Docker
-```bash
-# Start full stack (Ollama + InnerBoard)
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Manual Docker Usage
-```bash
-# Build image
-docker build -t innerboard-local .
-
-# Run with volume mounting
-docker run --rm -it \
-  --network host \
-  -v $(pwd)/data:/app/data \
-  innerboard-local add "Your reflection here"
-```
-
-## 🔨 Development
-
-### Setting up Development Environment
-```bash
-# Clone repository
-git clone https://github.com/ramper-labs/InnerBoard-local.git
-cd InnerBoard-local
-
-# Install development dependencies
-make install-dev
-
-# Set up pre-commit hooks
-pre-commit install
-
-# Pull default model
-make setup-ollama
-```
-
-### Available Make Commands
-```bash
-make help          # Show all available commands
-make test          # Run test suite
-make lint          # Run linting and type checking
-make format        # Format code with black
-make ci            # Run full CI pipeline
-make docker-build  # Build Docker image
-make demo          # Run demo reflection
-```
-
-## 🛡️ Security Features
-
-- **Encrypted Storage**: All reflections encrypted at rest using Fernet (AES-128)
-- **Network Isolation**: Blocks all outbound traffic during AI processing, allowing only loopback to `localhost:11434` for Ollama
-- **Local Processing**: No data transmission to external services
-- **Memory Safety**: Models run in isolated processes
-- **Key Management**: Secure key generation and storage with validation
-- **Input Validation**: Comprehensive validation of all user inputs and AI outputs
-- **Error Handling**: Structured error handling with custom exceptions
-- **Audit Logging**: Optional detailed logging for security monitoring
-
-## 🎯 Use Cases
-
-- **Standups and 1:1s**: Fast, focused updates for your team and manager
-- **Release/Iteration Reviews**: Summarize what changed and what’s next
-- **Incident/Debugging Recaps**: Capture steps taken, blockers, and follow-ups
-- **Planning Prep**: Translate console work into clear next actions
-
-## ✨ Production-Ready Enhancements
-
-This version represents a complete production-ready implementation with enterprise-grade features:
-
-### 🔒 **Military-Grade Security**
-- **PBKDF2 Implementation**: 100,000 iterations for cryptographically secure key derivation
-- **Advanced Input Validation**: Blocks SQL injection, XSS, path traversal, and other attacks
-- **Data Integrity**: SHA256 checksums for all stored reflections
-- **Network Isolation**: Robust connection handling allowing only Ollama localhost access
-- **Secure File Operations**: Safe deletion with file overwriting
-
-### 🧠 **Intelligent AI Integration**
-- **SRE Enhancement**: Advanced structured reflection extraction with confidence tracking
-- **MAC Optimization**: Professional micro-advice composer with priority assessment
-- **Model Flexibility**: Dynamic switching between Ollama models (gpt-oss:20b, llama3.1, etc.)
-- **Caching Intelligence**: Multi-level TTL caching for responses, models, and reflections
-- **Connection Pooling**: Efficient Ollama client management with thread safety
-
-### ⚡ **High-Performance Architecture**
-- **SQLite Optimization**: WAL mode, foreign key enforcement, indexed queries
-- **Memory Management**: Automatic cache cleanup with configurable size limits
-- **Thread Safety**: All operations designed for concurrent access
-- **GPU Acceleration**: Leverages platform capabilities via Ollama
-- **Resource Efficiency**: Connection pooling and intelligent resource management
-
-### 🎨 **Exceptional User Experience**
-- **Rich Terminal Interface**: Beautiful tables, progress bars, and formatted output
-- **Comprehensive Help**: Detailed command documentation and usage guidance
-- **Error Recovery**: User-friendly error messages with actionable solutions
-- **Progress Feedback**: Real-time indicators during AI processing
-- **Multi-format Display**: Tables, panels, structured data, and rich text
-
-### ⚙️ **Production Configuration**
-- **Environment Management**: Full .env file support with python-dotenv
-- **Validation Framework**: Configuration validation with helpful error messages
-- **Runtime Flexibility**: Dynamic configuration updates without restart
-- **Security-First**: Password management via environment variables
-- **Logging Control**: Configurable logging levels and output formats
-
-### 🧪 **Comprehensive Quality Assurance**
-- **50/50 Tests Passing**: 100% test success rate with comprehensive coverage
-- **Security Testing**: 16 dedicated security tests covering all attack vectors
-- **Performance Testing**: 17 cache and performance optimization tests
-- **Integration Testing**: 11 full-workflow integration tests
-- **Manual Validation**: Complete user journey testing and verification
-
-### 🐳 **Containerization & Deployment**
-- **Docker Support**: Complete containerized deployment with docker-compose
-- **Full-Stack Orchestration**: Ollama + InnerBoard in coordinated containers
-- **Volume Management**: Persistent data storage with proper permissions
-- **Network Configuration**: Secure inter-container communication
-
-### 🔧 **Development Excellence**
-- **Type Safety**: Full type hints throughout the entire codebase
-- **Error Handling**: Comprehensive custom exception hierarchy
-- **Code Quality**: Black formatting, flake8 linting, mypy type checking
-- **Development Tools**: Makefile automation, pre-commit hooks, CI pipeline
-- **Documentation**: Comprehensive README with step-by-step workflows
-
-### 📊 **Verified Production Metrics**
-- **Security**: Blocks 100% of tested attack vectors (SQL injection, XSS, path traversal)
-- **Performance**: AI analysis completes in 26-60 seconds with intelligent caching
-- **Reliability**: 100% test pass rate (50/50) with comprehensive error handling
-- **User Experience**: Intuitive CLI with beautiful Rich formatting and helpful guidance
-- **Scalability**: Thread-safe operations supporting concurrent usage
-- **Data Integrity**: SHA256 checksums verified for all stored reflections
-- **Network Security**: Only localhost Ollama connections allowed during processing
-
-## 🏆 **Production Validation**
-
-This implementation has been thoroughly tested and validated through comprehensive testing:
-
-### ✅ **Complete User Journey Testing**
-- **First-Run Flow**: Step-by-step setup and initial configuration
-- **Daily Usage**: Adding reflections, viewing analysis, managing data
-- **Configuration**: Environment variables, .env files, model switching
-- **Error Scenarios**: Invalid inputs, missing models, network issues
-- **Data Management**: CRUD operations, clearing, backup strategies
-
-### ✅ **Security Validation**
-- **Attack Vectors**: Tested SQL injection, XSS, path traversal attempts
-- **Encryption**: Verified PBKDF2 key derivation and Fernet AES-128
-- **Input Validation**: Comprehensive validation of all user inputs
-- **Network Isolation**: Confirmed only Ollama localhost connections allowed
-- **Data Integrity**: SHA256 checksums verified for data tampering detection
-
-### ✅ **Performance Verification**
-- **AI Analysis**: Real-time testing with gpt-oss:20b model (26-60s response time)
-- **Caching**: TTL-based caching working with 90%+ cache hit rate for repeated operations
-- **Database**: SQLite WAL mode and indexed queries validated
-- **Memory Management**: Automatic cache cleanup and size limits confirmed
-- **Thread Safety**: Concurrent operations tested and verified
-
-### ✅ **Integration Testing**
-- **Ollama Integration**: Seamless model switching and connection pooling
-- **File System**: Secure vault creation, key management, data persistence
-- **Configuration**: Environment variables and .env file loading
-- **Error Handling**: Comprehensive exception handling and recovery
-- **CLI Interface**: Rich UI components and user-friendly interactions
-
-## 🤝 Contributing
-
-This project follows the technical plan for the "Best Local Agent" hackathon category. Key areas for contribution:
-
-1. **Fine-tuning**: Improve SRE accuracy with domain-specific training data
-2. **Models**: Test and optimize different Ollama models
-3. **UI**: Add Streamlit interface for better UX
-4. **Export**: Implement privacy-preserving analytics
-5. **Performance**: Add caching layers and optimize LLM interactions
-6. **Testing**: Expand test coverage and add integration tests
-
 ## 📄 License
 
 Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
@@ -940,92 +438,6 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 - Built with [Click](https://click.palletsprojects.com/) for CLI, [Rich](https://rich.readthedocs.io/) for UI, [Cryptography](https://cryptography.io/) for security
 
 ---
-
-## 🎯 **Ready for Production**
-
-InnerBoard-local is now a **complete, production-ready application** with:
-
-- **🔒 Enterprise Security**: PBKDF2, Fernet AES-128, comprehensive input validation
-- **🧠 Intelligent AI**: Structured reflection extraction + micro-advice composition
-- **⚡ High Performance**: Intelligent caching, connection pooling, SQLite optimization
-- **🎨 Beautiful UX**: Rich terminal interface with progress indicators and tables
-- **⚙️ Flexible Configuration**: Environment variables, .env files, runtime updates
-- **🧪 Comprehensive Testing**: 50/50 tests passing with 100% coverage
-- **🐳 Container Ready**: Complete Docker deployment with docker-compose
-- **📊 Production Metrics**: Verified performance, security, and reliability
-
-## 📋 **Quick Command Reference**
-
-| Command | Description | Example Output |
-|---------|-------------|----------------|
-| `innerboard init` | Initialize encrypted vault | ✅ Encryption key generated and saved<br>✅ Vault encryption test passed<br>🎉 Setup Complete! |
-| `innerboard add "text"` | Add reflection with AI analysis | ✓ Reflection saved with ID: 1<br>📊 Structured Analysis<br>🎯 Actionable Advice |
-| `innerboard list` | View all reflections | Table with ID, Preview, Timestamp |
-| `innerboard status` | System health check | Key file: ✓<br>Vault file: ✓<br>Total reflections: X |
-| `innerboard models` | Available AI models | gpt-oss:20b<br>Current model: gpt-oss:20b |
-| `innerboard clear --force` | Clear all data | ✓ Vault cleared: vault.db |
-| `innerboard --help` | Show all commands | Full command listing with options |
-
-## 🔄 Complete Workflow Examples
-
-### Daily Reflection Workflow
-
-```bash
-# Morning reflection
-innerboard add "Starting work on the authentication service today. Need to understand JWT implementation and OAuth2 flows."
-
-# Afternoon update  
-innerboard add "Made progress on JWT validation but stuck on refresh token handling. Documentation is unclear."
-
-# End of day review
-innerboard list
-```
-
-### Console Activity Analysis Pipeline
-
-```bash
-# 1) Record an interactive session (type `exit` to finish)
-innerboard record --name standup_prep
-
-# 2) Generate meeting prep from all recorded sessions
-innerboard prep --show-sre
-```
-
-### Multi-Session Meeting Prep
-
-```bash
-# Generate comprehensive meeting prep from stored sessions
-innerboard prep --show-sre
-```
-
-## 📋 Complete Command Reference
-
-### Core Reflection Commands
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `innerboard init` | Initialize encrypted vault | `innerboard init` |
-| `innerboard add "text"` | Add reflection with AI analysis | `innerboard add "Struggling with authentication..."` |
-| `innerboard list` | View all reflections | `innerboard list --limit 20` |
-| `innerboard status` | System health check | `innerboard status` |
-| `innerboard models` | Available AI models | `innerboard models` |
-| `innerboard clear` | Clear all data (with confirmation) | `innerboard clear --force` |
-
-### Console Activity Processing
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `innerboard record` | Record interactive terminal session | `innerboard record --name standup` |
-| `innerboard prep` | Generate meeting prep from sessions | `innerboard prep --show-sre` |
-
-### Options and Flags
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `--output PATH` | Save output to file | `--output results.json` |
-| `--model MODEL` | Override default AI model | `--model llama3.1` |
-| `--verbose` | Enable debug logging | `innerboard --verbose list` |
-| `--force` | Skip confirmation prompts | `innerboard clear --force` |
 
 ## 📊 Example Output Formats
 
@@ -1088,32 +500,5 @@ e4f5g6h Update user service endpoints
   ]
 }
 ```
-
-## 🧪 Live Demo Results
-
-### **Test Run 1: Console Log Processing**
-
-**Input**: Raw terminal log with navigation, script execution, and errors
-**Output**: Structured SRE session with:
-- ✅ **Key Successes**: Directory navigation, Python script execution, repository listing
-- 🚧 **Blockers**: Command errors, missing directories, incorrect Java syntax
-- 📋 **Resources**: File paths, commands, and relevant documentation
-- 📝 **Summary**: High-level overview of the session activities
-
-### **Test Run 2: Meeting Prep Generation**
-
-**Input**: SRE session JSON
-**Output**: Professional MAC meeting prep with:
-- 👥 **Team Updates**: "✅ Navigated to InnerBoard-local and ran synth.py successfully"
-- 👔 **Manager Updates**: "Outcome: Python script executed, repository structure verified"
-- 💡 **Recommendations**: "Verify Java directory path and adjust cd command accordingly"
-
-### **Test Run 3: Direct Console Processing**
-
-**Input**: `"cd ~/project && kubectl get pods -n production && git log --oneline -3"`
-**Output**: Complete analysis pipeline:
-- 📊 Console session insights with structured breakdown
-- 🗣️ Meeting prep with team/manager updates and recommendations
-- 🚀 Beautiful Rich terminal formatting with tables and panels
 
 **Your offline meeting prep companion that stays on your device.** ✨

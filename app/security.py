@@ -284,7 +284,7 @@ class InputValidator:
         "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "0123456789"
-        " .,!?-()[]{}:;\"'\n\t"
+        " .,!?-()[]{}:;\"'\n\t_"
         "áéíóúàèìòùâêîôûäëïöüÿñç"
         "ÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÄËÏÖÜŸÑÇ"
     )
