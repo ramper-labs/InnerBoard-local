@@ -201,9 +201,11 @@ fi
 
 echo
 ok "Setup complete!"
-echo "Next steps:"
+ABS_REPO_DIR="$(pwd)"
+echo "Next steps (run in your shell):"
+echo "  cd ${ABS_REPO_DIR}"
 echo "  source .venv/bin/activate"
+echo "Then try:"
 echo "  innerboard record"
 echo "  innerboard add \"My reflection\""
 echo "  innerboard prep --show-sre"
-echo
