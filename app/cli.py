@@ -3,6 +3,8 @@ Modern CLI interface for InnerBoard-local using Click.
 Provides a user-friendly command-line interface with rich formatting and progress indicators.
 """
 
+from __future__ import annotations
+
 import sys
 import os
 from pathlib import Path
