@@ -1669,61 +1669,79 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
             use_util_linux_timing = "--timing" in help_out
             use_flush_option = "-f" in help_out
 
-            # Start recording with timing support
-            # Launch background session monitor before starting the recorder
-            monitor = SessionMonitor(
-                log_path=output_path,
-                timing_path=timing_path,
-                session_root_dir=output_path.parent,
-                inactivity_seconds=15 * 60,
-                max_lines_per_segment=1000,
+            # Heuristically detect if help indicates '-t file' form (BSD/macOS)
+            bsd_takes_file = (
+                "-t file" in help_out
+                or "[-t file]" in help_out
+                or "-t <file>" in help_out
             )
-            monitor.start()
+            is_macos = platform.system() == "Darwin"
+
+            # util-linux and FreeBSD-like `script` support timing.
+            # Other BSDs might. Stock macOS `script` does not appear to.
+            timing_supported = use_util_linux_timing or bsd_takes_file or not is_macos
+
+            monitor = None
+            if timing_supported:
+                # Launch background session monitor before starting the recorder
+                monitor = SessionMonitor(
+                    log_path=output_path,
+                    timing_path=timing_path,
+                    session_root_dir=output_path.parent,
+                    inactivity_seconds=15 * 60,
+                    max_lines_per_segment=1000,
+                )
+                monitor.start()
+            else:
+                console.print("[yellow]Warning: This version of 'script' on macOS does not support timing recording.[/yellow]")
+
+
+            # Start recording with timing support
+            base = [script_path, "-q"]
+            if flush and use_flush_option:
+                base.append("-f")
+
+            proc = None
             if use_util_linux_timing:
                 # util-linux: prefer -T/--log-timing FILE; run interactive default shell
-                base = [script_path, "-q"]
-                if flush and use_flush_option:
-                    base.append("-f")
                 cmd = base + ["-T", str(timing_path), str(output_path)]
                 console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
                 proc = subprocess.Popen(cmd)
                 proc.wait()
-                if proc.returncode != 0:
-                    raise RuntimeError(f"script exited with code {proc.returncode}")
-            else:
-                # BSD/macOS variant: prefer '-t <file>' if supported; otherwise use '-t 0' to stderr
-                base = [script_path, "-q"]
-                if flush and use_flush_option:
-                    base.append("-f")
-                # Heuristically detect if help indicates '-t file' form (BSD/macOS)
-                bsd_takes_file = (
-                    "-t file" in help_out
-                    or "[-t file]" in help_out
-                    or "-t <file>" in help_out
-                )
-                if bsd_takes_file:
-                    cmd = base + ["-t", str(timing_path), str(output_path)]
-                    console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
-                    proc = subprocess.Popen(cmd)
+            elif bsd_takes_file:
+                # BSD/macOS variant that supports -t <file>
+                cmd = base + ["-t", str(timing_path), str(output_path)]
+                console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                proc = subprocess.Popen(cmd)
+                proc.wait()
+            elif timing_supported:
+                # Fallback for other BSDs: timing to stderr, redirect to timing file
+                cmd = base + ["-t", "0", str(output_path)]
+                console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                with open(timing_path, "wb") as timing_fp:
+                    proc = subprocess.Popen(cmd, stderr=timing_fp)
                     proc.wait()
-                else:
-                    # Fallback: timing to stderr, redirect to timing file
-                    cmd = base + ["-t", "0", str(output_path)]
-                    console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
-                    with open(timing_path, "wb") as timing_fp:
-                        proc = subprocess.Popen(cmd, stderr=timing_fp)
-                        proc.wait()
-                if proc.returncode != 0:
-                    raise RuntimeError(f"script exited with code {proc.returncode}")
-            # Stop monitor and compact files after recording ends
-            try:
-                monitor.stop()
-                monitor.join(timeout=10)
-                monitor.compact_original_files()
-            except Exception as e:
-                logger.warning(f"Session monitor cleanup failed: {e}")
+            else:
+                # No timing support (e.g., stock macOS)
+                cmd = base + [str(output_path)]
+                console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                proc = subprocess.Popen(cmd)
+                proc.wait()
 
-            console.print(f"[green]✓[/green] Timing saved to: {timing_path}")
+            if proc and proc.returncode != 0:
+                raise RuntimeError(f"script exited with code {proc.returncode}")
+
+            # Stop monitor and compact files after recording ends
+            if monitor:
+                try:
+                    monitor.stop()
+                    monitor.join(timeout=10)
+                    monitor.compact_original_files()
+                except Exception as e:
+                    logger.warning(f"Session monitor cleanup failed: {e}")
+
+            if timing_supported:
+                console.print(f"[green]✓[/green] Timing saved to: {timing_path}")
         else:
             # Native Windows: Use a single interactive PowerShell with transcript
             powershell = shutil.which("powershell") or shutil.which("pwsh")
