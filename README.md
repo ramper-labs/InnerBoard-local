@@ -80,21 +80,26 @@ InnerBoard-local analyzes your terminal sessions and produces concise, professio
 
 Choose the installation method that works best for you:
 
-### **⚡ Quick Start (Recommended)**
-For new users, simply run our automated setup script:
+### **⚡ Quick Start (Recommended: Native Install)**
+Run one command per OS to install natively with a virtual environment and local Ollama:
 
+macOS / Linux:
 ```bash
-# Download and run the quick start script
 curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh | bash
 ```
 
-This script will:
-- ✅ Check your system prerequisites
-- ✅ Handle externally managed Python environments (creates virtual environment automatically)
-- ✅ Install InnerBoard-local automatically
-- ✅ Set up Ollama and download AI models
+Windows (PowerShell):
+```powershell
+iwr https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.ps1 -UseBasicParsing | iex
+```
+
+The script will:
+- ✅ Create/activate a Python virtual environment
+- ✅ Install InnerBoard-local
+- ✅ Ensure Ollama is installed and running locally
+- ✅ Pull the default AI model (`gpt-oss:20b`)
 - ✅ Initialize your encrypted vault
-- ✅ Verify everything works
+- ✅ Run health checks
 
 **That's it!** You're ready to start using InnerBoard-local.
 
@@ -114,10 +119,14 @@ This script will:
 git clone https://github.com/ramper-labs/InnerBoard-local.git
 cd InnerBoard-local
 
-# 2. Install InnerBoard
+# 2. Environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install InnerBoard
 pip install -e .
 
-# 3. Run automated setup
+# 4. Run automated setup
 innerboard setup
 ```
 

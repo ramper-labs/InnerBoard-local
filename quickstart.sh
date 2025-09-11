@@ -1,3 +1,108 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Cross-platform native quickstart for developers (macOS/Linux)
+# - Creates Python venv, installs package, ensures Ollama is running, pulls model,
+#   copies example.env -> .env, initializes vault, runs health.
+
+BLUE="\033[0;34m"; GREEN="\033[0;32m"; YELLOW="\033[1;33m"; RED="\033[0;31m"; NC="\033[0m"
+say() { echo -e "${BLUE}$*${NC}"; }
+ok() { echo -e "${GREEN}✓ $*${NC}"; }
+warn() { echo -e "${YELLOW}⚠ $*${NC}"; }
+die() { echo -e "${RED}✗ $*${NC}" >&2; exit 1; }
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    die "Missing required command: $1"
+  fi
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+say "InnerBoard-local quickstart (native: macOS/Linux)"
+
+# Preconditions
+require_cmd python3 || true
+require_cmd git || true
+
+# Python version info
+PYV="$(python3 -c 'import sys; print("%d.%d"%sys.version_info[:2])' 2>/dev/null || echo "0.0")"
+case "$PYV" in
+  3.10|3.11|3.12|3.13) : ;; 
+  *) warn "Detected Python $PYV. Recommended: 3.11 (3.10–3.13 supported)." ;;
+esac
+
+# Ensure venv
+if [ ! -d .venv ]; then
+  say "Creating virtual environment (.venv)"
+  python3 -m venv .venv || die "Failed to create virtual environment"
+fi
+
+# Activate venv (shellcheck disable=SC1091)
+source .venv/bin/activate || die "Failed to activate virtual environment"
+ok "Virtual environment ready"
+
+# Do not auto-create .env; inform user if missing
+if [ ! -f .env ]; then
+  warn ".env not found; defaults will be used. To customize, copy example.env to .env"
+fi
+
+say "Installing InnerBoard-local (editable)"
+pip install --upgrade pip >/dev/null 2>&1 || true
+pip install -e . || die "pip install failed"
+ok "Package installed"
+
+# Ensure Ollama present and running
+if ! command -v ollama >/dev/null 2>&1; then
+  say "Ollama not found. Attempting to install..."
+  if [[ "${OSTYPE:-}" == darwin* ]]; then
+    if command -v brew >/dev/null 2>&1; then
+      brew install ollama || die "Failed to install Ollama via Homebrew"
+    else
+      die "Homebrew not found. Install Homebrew (https://brew.sh/) or install Ollama manually from https://ollama.com"
+    fi
+  else
+    curl -fsSL https://ollama.com/install.sh | sh || die "Failed to install Ollama via install.sh"
+  fi
+fi
+
+say "Starting Ollama service"
+if [[ "${OSTYPE:-}" == darwin* ]]; then
+  (brew services start ollama >/dev/null 2>&1 || true)
+fi
+if ! pgrep -x ollama >/dev/null 2>&1; then
+  (ollama serve >/dev/null 2>&1 &) || true
+fi
+
+# Wait for Ollama API
+say "Waiting for Ollama (http://localhost:11434)"
+for i in {1..30}; do
+  if curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1; then
+    ok "Ollama is responding"
+    break
+  fi
+  sleep 1
+  if [ "$i" -eq 30 ]; then die "Ollama did not start"; fi
+done
+
+say "Pulling default model (gpt-oss:20b)"
+ollama pull gpt-oss:20b || warn "Model pull failed; you can retry later: ollama pull gpt-oss:20b"
+
+say "Initializing vault"
+innerboard init --no-interactive || warn "Vault init may require manual run: innerboard init"
+
+say "Running health check"
+innerboard health --detailed || warn "Health check reported issues"
+
+echo
+ok "Setup complete!"
+echo "Next steps:"
+echo "  source .venv/bin/activate"
+echo "  innerboard record"
+echo "  innerboard add \"My reflection\""
+echo "  innerboard prep --show-sre"
+echo
 #!/bin/bash
 # InnerBoard-local Quick Start Script
 # This script helps new users get up and running quickly
