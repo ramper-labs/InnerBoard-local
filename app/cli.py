@@ -32,6 +32,7 @@ from app.utils import (
     format_reflection_preview,
     get_sessions_dir,
     build_unique_session_path,
+    clean_terminal_log,
 )
 from app.models import SRESession
 from app.session_monitor import SessionMonitor
@@ -773,3 +774,74 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
 
 if __name__ == "__main__":
     cli()
+
+# Hidden/internal command to regenerate SRE for a specific segment path
+
+@cli.command("regen-segment", hidden=True)
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option("--model", "model", type=str, required=False, help="Override Ollama model")
+def regen_segment(path: Path, model: Optional[str] = None):
+    """Regenerate SRE JSON for a given segment directory or file path.
+
+    This command is internal and hidden from help. It accepts either the
+    path to a segment directory (containing cleaned.log/raw.log) or a path
+    to a file within that directory, and overwrites the segment's sre.json.
+    """
+    try:
+        # Resolve segment directory from provided path
+        candidate = Path(path)
+        if candidate.is_file():
+            seg_dir = candidate.parent
+        else:
+            seg_dir = candidate
+
+        # Walk upwards a few levels to find a directory that looks like a segment
+        max_ascend = 3
+        ascended = 0
+        while ascended <= max_ascend and not (
+            (seg_dir / "cleaned.log").exists() or (seg_dir / "raw.log").exists()
+        ):
+            parent = seg_dir.parent
+            if parent == seg_dir:
+                break
+            seg_dir = parent
+            ascended += 1
+
+        cleaned_log_path = seg_dir / "cleaned.log"
+        raw_log_path = seg_dir / "raw.log"
+        sre_output_path = seg_dir / "sre.json"
+
+        if cleaned_log_path.exists():
+            with cleaned_log_path.open("r", encoding="utf-8", errors="ignore") as fp:
+                input_text = fp.read()
+        elif raw_log_path.exists():
+            with raw_log_path.open("r", encoding="utf-8", errors="ignore") as fp:
+                raw_text = fp.read()
+            input_text = clean_terminal_log(raw_text)
+            # Best-effort write cleaned.log for consistency
+            try:
+                with cleaned_log_path.open("w", encoding="utf-8") as cfp:
+                    cfp.write(input_text)
+            except Exception:
+                pass
+        else:
+            console.print(
+                f"[red]Could not find cleaned.log or raw.log near: {path}[/red]"
+            )
+            sys.exit(1)
+
+        with console.status("[bold green]Regenerating SRE for segment...[/bold green]"):
+            with no_network():
+                llm = LocalLLM(model=model if model else config.ollama_model)
+                service = AdviceService(llm)
+                sessions = service.get_console_insights(input_text)
+            sre_json = json.dumps([s.model_dump() for s in sessions], indent=2)
+            with sre_output_path.open("w", encoding="utf-8") as fp:
+                fp.write(sre_json)
+
+        console.print(
+            f"[green]✓[/green] SRE regenerated and written to: {sre_output_path}"
+        )
+    except Exception as e:
+        logger.error(f"regen-segment failed: {e}")
+        console.print(f"[red]Error:[/red] {e}")

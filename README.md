@@ -300,7 +300,6 @@ innerboard status
 
 ```bash
 # Set your preferences
-export OLLAMA_MODEL="llama3.1"           # Change AI model
 export MAX_TOKENS="1000"                 # Longer responses
 export LOG_LEVEL="DEBUG"                 # Verbose logging
 export INNERBOARD_KEY_PASSWORD="mypassword"  # Skip password prompts
@@ -517,7 +516,7 @@ export ENABLE_CACHING=true                  # Enable intelligent caching
 export CACHE_TTL_SECONDS=3600               # Cache TTL in seconds
 
 # Logging
-export LOG_LEVEL=INFO                       # Logging level (DEBUG, INFO, WARNING, ERROR)
+export LOG_LEVEL=ERROR                       # Logging level (DEBUG, INFO, WARNING, ERROR)
 ```
 
 ### Configuration File
