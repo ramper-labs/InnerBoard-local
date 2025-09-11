@@ -1691,15 +1691,28 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
                 if proc.returncode != 0:
                     raise RuntimeError(f"script exited with code {proc.returncode}")
             else:
-                # BSD: use '-t 0' (timing to stderr) and redirect stderr to timing file
+                # BSD/macOS variant: prefer '-t <file>' if supported; otherwise use '-t 0' to stderr
                 base = [script_path, "-q"]
                 if flush and use_flush_option:
                     base.append("-f")
-                cmd = base + ["-t", "0", str(output_path)]
-                console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
-                with open(timing_path, "wb") as timing_fp:
-                    proc = subprocess.Popen(cmd, stderr=timing_fp)
+                # Heuristically detect if help indicates '-t file' form (BSD/macOS)
+                bsd_takes_file = (
+                    "-t file" in help_out
+                    or "[-t file]" in help_out
+                    or "-t <file>" in help_out
+                )
+                if bsd_takes_file:
+                    cmd = base + ["-t", str(timing_path), str(output_path)]
+                    console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                    proc = subprocess.Popen(cmd)
                     proc.wait()
+                else:
+                    # Fallback: timing to stderr, redirect to timing file
+                    cmd = base + ["-t", "0", str(output_path)]
+                    console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
+                    with open(timing_path, "wb") as timing_fp:
+                        proc = subprocess.Popen(cmd, stderr=timing_fp)
+                        proc.wait()
                 if proc.returncode != 0:
                     raise RuntimeError(f"script exited with code {proc.returncode}")
             # Stop monitor and compact files after recording ends
