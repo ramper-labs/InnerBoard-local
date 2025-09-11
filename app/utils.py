@@ -400,7 +400,7 @@ def get_app_data_dir(app_name: str = "InnerBoard") -> Path:
     Get the appropriate per-user application data directory for the OS.
 
     On Windows: %LOCALAPPDATA%\\{app_name}
-    On macOS: ~/Library/Application Support/{app_name}
+    On macOS: ~/Library/{app_name} (no spaces for better CLI usability)
     On Linux: $XDG_DATA_HOME/{app_name} or ~/.local/share/{app_name}
 
     Args:
@@ -418,7 +418,9 @@ def get_app_data_dir(app_name: str = "InnerBoard") -> Path:
     # POSIX: macOS or Linux/WSL
     system = platform.system().lower()
     if system == "darwin":
-        base_path = Path.home() / "Library" / "Application Support"
+        # Use ~/Library/{app_name} instead of ~/Library/Application Support/{app_name}
+        # to avoid spaces in the path for better CLI usability
+        base_path = Path.home() / "Library"
     else:
         # Linux and WSL
         base_path = Path(os.getenv("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
@@ -429,13 +431,52 @@ def get_sessions_dir(app_name: str = "InnerBoard") -> Path:
     """
     Get (and ensure) the sessions directory under the app data directory.
 
+    On macOS: ~/Library/{app_name}/sessions (no spaces for CLI usability)
+    On Windows: %LOCALAPPDATA%\\{app_name}\\sessions
+    On Linux: $XDG_DATA_HOME/{app_name}/sessions or ~/.local/share/{app_name}/sessions
+
     Args:
         app_name: Application name
 
     Returns:
         Path to the ensured sessions directory
     """
-    return ensure_directory(get_app_data_dir(app_name) / "sessions")
+    new_sessions_dir = ensure_directory(get_app_data_dir(app_name) / "sessions")
+
+    # Migration: Check for old macOS location and migrate files
+    if platform.system().lower() == "darwin":
+        old_app_dir = Path.home() / "Library" / "Application Support" / app_name
+        if old_app_dir.exists():
+            old_sessions_dir = old_app_dir / "sessions"
+            if old_sessions_dir.exists():
+                logger.info(f"Migrating sessions from {old_sessions_dir} to {new_sessions_dir}")
+                try:
+                    # Copy all files from old location to new location
+                    import shutil
+                    for item in old_sessions_dir.iterdir():
+                        dest = new_sessions_dir / item.name
+                        if item.is_file():
+                            shutil.copy2(item, dest)
+                        elif item.is_dir():
+                            shutil.copytree(item, dest, dirs_exist_ok=True)
+
+                    # Also copy other files (like vault files)
+                    for item in old_app_dir.iterdir():
+                        if item.name != "sessions":
+                            dest = get_app_data_dir(app_name) / item.name
+                            if item.is_file():
+                                shutil.copy2(item, dest)
+                            elif item.is_dir():
+                                shutil.copytree(item, dest, dirs_exist_ok=True)
+
+                    logger.info("Migration completed successfully")
+                    # Note: We don't remove the old directory automatically to be safe
+                    # Users can manually remove it after confirming everything works
+
+                except Exception as e:
+                    logger.warning(f"Failed to migrate files from {old_sessions_dir}: {e}")
+
+    return new_sessions_dir
 
 
 def generate_session_filename(

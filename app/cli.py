@@ -1497,7 +1497,7 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
             # Build timing file path alongside the log
             timing_path = output_path.with_suffix(".timing")
 
-            # Detect util-linux vs BSD script variant
+            # Detect script variant capabilities
             try:
                 help_out = subprocess.run(
                     [script_path, "--help"],
@@ -1510,6 +1510,7 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
                 help_out = ""
 
             use_util_linux_timing = "--timing" in help_out
+            use_flush_option = "-f" in help_out
 
             # Start recording with timing support
             # Launch background session monitor before starting the recorder
@@ -1524,7 +1525,7 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
             if use_util_linux_timing:
                 # util-linux: prefer -T/--log-timing FILE; run interactive default shell
                 base = [script_path, "-q"]
-                if flush:
+                if flush and use_flush_option:
                     base.append("-f")
                 cmd = base + ["-T", str(timing_path), str(output_path)]
                 console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
@@ -1535,7 +1536,7 @@ def record(output_dir: Optional[str], filename: Optional[str], shell_path: Optio
             else:
                 # BSD: use '-t 0' (timing to stderr) and redirect stderr to timing file
                 base = [script_path, "-q"]
-                if flush:
+                if flush and use_flush_option:
                     base.append("-f")
                 cmd = base + ["-t", "0", str(output_path)]
                 console.print("[bold green]Recording started.[/bold green] Type 'exit' to finish.")
