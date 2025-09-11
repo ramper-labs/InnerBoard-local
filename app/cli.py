@@ -601,7 +601,7 @@ def _pull_model(no_interactive: bool) -> bool:
                 ["ollama", "pull", model_name],
                 capture_output=True,
                 text=True,
-                timeout=600  # 10 minute timeout
+                timeout=6000  # 100 minute timeout
             )
 
         if result.returncode != 0:
