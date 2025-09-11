@@ -11,14 +11,23 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_MAX_QUEUE=512
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 10s
+    networks:
+      - innerboard-network
 
   innerboard:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     container_name: innerboard-app
     depends_on:
       ollama:
@@ -29,13 +38,41 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - LOG_LEVEL=INFO
+      - INNERBOARD_DB_PATH=/app/data/vault.db
+      - INNERBOARD_KEY_PATH=/app/data/vault.key
+      - ENABLE_CACHING=true
+      - CACHE_TTL_SECONDS=3600
     working_dir: /app/data
-    command: ["innerboard", "list"]
+    command: ["innerboard", "status"]
     profiles:
       - app
+    networks:
+      - innerboard-network
+    restart: unless-stopped
+
+  # Optional: Web interface (future enhancement)
+  # web:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.web
+  #   ports:
+  #     - "8501:8501"
+  #   depends_on:
+  #     - innerboard
+  #   profiles:
+  #     - web
+  #   networks:
+  #     - innerboard-network
+
+networks:
+  innerboard-network:
+    driver: bridge
+    name: innerboard-network
 
 volumes:
   ollama_data:
     driver: local
+    name: innerboard-ollama-data
   innerboard_data:
     driver: local
+    name: innerboard-data

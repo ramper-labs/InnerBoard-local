@@ -13,8 +13,15 @@ endif
 
 # Default target
 help: ## Show this help message
-	@echo "InnerBoard-local Development Commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo "InnerBoard-local Commands:"
+	@echo "Installation & Setup:"
+	@grep -E '^(install|setup|health|docker-setup):.*## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "Development:"
+	@grep -E '^(test|lint|format|ci):.*## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "Docker:"
+	@grep -E '^(docker-):.*## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Installation
 install: ## Install InnerBoard-local
@@ -57,10 +64,52 @@ docker-compose-up: ## Start all services with docker-compose
 docker-compose-down: ## Stop all services
 	$(DOCKER_COMPOSE) down
 
-# Ollama setup
-setup-ollama: ## Pull the default model for Ollama
+# Setup commands
+setup: ## Complete setup (install + ollama + vault)
+	@echo "🚀 Running complete InnerBoard setup..."
+	$(MAKE) install
+	$(MAKE) setup-ollama
+	innerboard init --no-interactive
+	innerboard health
+
+setup-interactive: ## Interactive setup wizard
+	@echo "🚀 Running interactive setup..."
+	innerboard setup
+
+setup-ollama: ## Setup Ollama and pull default model
+	@echo "🤖 Setting up Ollama..."
+	@if command -v ollama >/dev/null 2>&1; then \
+		echo "Ollama already installed"; \
+	else \
+		echo "Installing Ollama..."; \
+		if [[ "$$OSTYPE" == "darwin"* ]]; then \
+			if command -v brew >/dev/null 2>&1; then \
+				brew install ollama; \
+			else \
+				echo "Please install Homebrew first: https://brew.sh/"; \
+				exit 1; \
+			fi \
+		else \
+			curl -fsSL https://ollama.com/install.sh | sh; \
+		fi \
+	fi
+	@echo "Starting Ollama service..."
+	@if [[ "$$OSTYPE" == "darwin"* ]]; then \
+		brew services start ollama 2>/dev/null || ollama serve & \
+	else \
+		ollama serve & \
+	fi
+	@sleep 3
 	@echo "Pulling default model (gpt-oss:20b)..."
 	ollama pull gpt-oss:20b
+
+health: ## Run health checks
+	@echo "🔍 Running health checks..."
+	innerboard health --detailed
+
+docker-setup: ## Setup with Docker
+	@echo "🐳 Setting up with Docker..."
+	./docker-setup.sh
 
 # Development setup
 dev-setup: install-dev setup-ollama ## Set up development environment

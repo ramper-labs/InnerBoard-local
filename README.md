@@ -4,7 +4,6 @@
 
 InnerBoard-local analyzes your terminal sessions and produces concise, professional talking points for your next standup or 1:1. Everything runs locally on your machine—no data ever leaves your device.
 
-[![PyPI version](https://badge.fury.io/py/innerboard-local.svg)](https://badge.fury.io/py/innerboard-local)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## 🎯 What It Does
@@ -34,7 +33,7 @@ InnerBoard-local analyzes your terminal sessions and produces concise, professio
 
 ## ✨ Features
 
-### 🔒 **Military-Grade Security**
+### 🔒 **Industry-Grade Security**
 - **PBKDF2 Key Derivation**: 100,000 iterations for cryptographically secure key generation
 - **Fernet AES-128 Encryption**: Industry-standard encryption for all stored data
 - **Password-Protected Keys**: Optional password encryption of master keys with integrity validation
@@ -55,6 +54,13 @@ InnerBoard-local analyzes your terminal sessions and produces concise, professio
   - Concrete recommendations with actionable next steps
   - Multi-session synthesis for comprehensive reporting
 
+### 🎨 **User-Friendly Low-Touch Experience**
+- **Rich Terminal Interface**: Beautiful tables, progress bars, and color-coded output
+- **Comprehensive Help**: Detailed command help and usage guidance
+- **Error Handling**: User-friendly messages with actionable solutions
+- **Progress Indicators**: Real-time feedback during AI processing
+- **Multi-format Display**: Tables, panels, structured data, and formatted text
+
 ### ⚡ **High Performance**
 - **Intelligent Caching**: TTL-based caching (responses, models, reflections)
 - **Connection Pooling**: Efficient Ollama client management (max 5 connections)
@@ -62,13 +68,6 @@ InnerBoard-local analyzes your terminal sessions and produces concise, professio
 - **GPU Acceleration**: Leverages platform capabilities via Ollama
 - **Memory Management**: Automatic cache cleanup and size limits
 - **Thread-Safe Operations**: All caching and connections are thread-safe
-
-### 🎨 **Exceptional User Experience**
-- **Rich Terminal Interface**: Beautiful tables, progress bars, and color-coded output
-- **Comprehensive Help**: Detailed command help and usage guidance
-- **Error Handling**: User-friendly messages with actionable solutions
-- **Progress Indicators**: Real-time feedback during AI processing
-- **Multi-format Display**: Tables, panels, structured data, and formatted text
 
 ### ⚙️ **Flexible Configuration**
 - **Environment Variables**: Full configuration via env vars and .env files
@@ -79,106 +78,112 @@ InnerBoard-local analyzes your terminal sessions and produces concise, professio
 
 ## 🚀 **Getting Started**
 
-Welcome to InnerBoard-local! This guide walks you through installation, recording console sessions, optional private notes, and generating meeting prep.
+Choose the installation method that works best for you:
 
----
-
-## **📋 Step 1: Prerequisites**
-
-### **Required Software**
-
-1. **Python 3.8+** (Required)
-   ```bash
-   # Check your Python version
-   python --version
-
-   # If you need to install Python, visit:
-   # https://python.org/downloads/
-   ```
-
-2. **Ollama** (Required for AI analysis)
-   - **Download**: Visit [ollama.com/download](https://ollama.com/download)
-   - **Install** the appropriate version for your operating system
-   - **Verify installation**:
-     ```bash
-     ollama --version
-     ```
-
----
-
-## **📦 Step 2: Installation**
-
-### **Option A: Install from PyPI (Recommended for most users)**
+### **⚡ Quick Start (Recommended)**
+For new users, simply run our automated setup script:
 
 ```bash
-# Install InnerBoard-local
-pip install innerboard-local
-
-# Verify installation
-innerboard --version
+# Download and run the quick start script
+curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh | bash
 ```
 
-### **Option B: Install from Source (For developers)**
+This script will:
+- ✅ Check your system prerequisites
+- ✅ Install InnerBoard-local automatically
+- ✅ Set up Ollama and download AI models
+- ✅ Initialize your encrypted vault
+- ✅ Verify everything works
+
+**That's it!** You're ready to start using InnerBoard-local.
+
+---
+
+### **📦 Alternative Installation Methods**
+
+#### **Option A: Manual Installation**
+
+**Prerequisites:**
+- Python 3.8+ ([download here](https://python.org/downloads/))
+- Git ([download here](https://git-scm.com/downloads))
+- Ollama ([download here](https://ollama.com/download))
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/ramper-labs/InnerBoard-local.git
 cd InnerBoard-local
 
-# Install in development mode
+# 2. Install InnerBoard
 pip install -e .
+
+# 3. Run automated setup
+innerboard setup
 ```
 
-### **Option C: Docker Installation (For containerized deployment)**
+#### **Option B: Docker Installation**
 
 ```bash
-# Quick start with Docker Compose (recommended)
+# 1. Clone the repository
+git clone https://github.com/ramper-labs/InnerBoard-local.git
+cd InnerBoard-local
+
+# 2. Run Docker setup script
+./docker-setup.sh
+```
+
+Or manually:
+```bash
+# Build and start services
 docker-compose up -d
 
-# Or build manually
-make docker-build
-make docker-run
+# Initialize InnerBoard (run once)
+docker-compose exec innerboard innerboard init
 ```
 
 ---
 
-## **🤖 Step 3: Setup AI Models**
+### **🔧 Post-Installation Setup**
 
-### **Pull Your First Model**
-
-```bash
-# Pull the default model (recommended for beginners)
-ollama pull gpt-oss:20b
-
-# Alternative: Llama 3.1 (smaller, faster)
-ollama pull llama3.1
-
-# Alternative: Mistral (good balance)
-ollama pull mistral
-```
-
-### **Verify Ollama is Running**
+After installation, verify everything is working:
 
 ```bash
-# Check if Ollama service is running
-ollama list
+# Check system health
+innerboard health
 
-# Expected output should show your downloaded models:
-# NAME           ID              SIZE     MODIFIED
-# gpt-oss:20b    aa4295ac10c3    13 GB    2 minutes ago
-```
-
-### **Choose Your Model**
-
-```bash
-# Set your preferred model (optional, defaults to gpt-oss:20b)
-export OLLAMA_MODEL="llama3.1"
-
-# Make it permanent by adding to your shell profile (~/.bashrc or ~/.zshrc):
-# echo 'export OLLAMA_MODEL="llama3.1"' >> ~/.bashrc
+# View available commands
+innerboard --help
 ```
 
 ---
+
+### **📋 Prerequisites (Manual Installation Only)**
+
+If you're not using the quick start script, ensure you have:
+
+**Required Software:**
+- **Python 3.8+**: Core runtime
+  ```bash
+  python3 --version  # Should show 3.8 or higher
+  ```
+
+- **Ollama**: Local AI model server
+  ```bash
+  # Install Ollama
+  curl -fsSL https://ollama.com/install.sh | sh
+
+  # Verify installation
+  ollama --version
+  ```
+
+- **Git**: Version control (for cloning)
+  ```bash
+  git --version
+  ```
+
+**System Requirements:**
+- **RAM**: 8GB minimum, 16GB recommended
+- **Storage**: 20GB free space for AI models
+- **OS**: Linux, macOS, or Windows (WSL)
 
 ## **🕹️ Step 4: Record a Console Session**
 
@@ -351,6 +356,40 @@ innerboard models
 
 ### **Common Issues**
 
+#### **Setup Issues**
+
+**Quick start script fails:**
+```bash
+# Try manual installation
+git clone https://github.com/ramper-labs/InnerBoard-local.git
+cd InnerBoard-local
+innerboard setup
+```
+
+**Docker setup fails:**
+```bash
+# Check Docker status
+docker --version
+docker-compose --version
+
+# Clean and retry
+docker system prune -a
+./docker-setup.sh
+```
+
+#### **Health Check Failures**
+
+**Run detailed health check:**
+```bash
+innerboard health --detailed
+```
+
+**Common health check issues:**
+- ❌ **Python Environment**: Upgrade to Python 3.8+
+- ❌ **Ollama Service**: Run `ollama serve`
+- ❌ **AI Model**: Run `ollama pull gpt-oss:20b`
+- ❌ **Vault System**: Run `innerboard init`
+
 #### **"Model not available" Error**
 ```bash
 # Solution: Pull the model
@@ -422,15 +461,34 @@ innerboard list --help
 
 ## **📋 Quick Reference**
 
+### **Installation & Setup**
 | Command | Description | Example |
 |---------|-------------|---------|
-| `innerboard record` | Record terminal session (with timing) | `innerboard record --name standup` |
-| `innerboard prep` | Generate meeting prep from sessions | `innerboard prep --show-sre` |
-| `innerboard init` | Setup encrypted vault (for private notes) | `innerboard init` |
-| `innerboard add "text"` | Add private note (encrypted) | `innerboard add "Investigated auth tokens"` |
-| `innerboard list` | View saved notes | `innerboard list` |
-| `innerboard status` | Vault health check | `innerboard status` |
-| `innerboard models` | Available AI models | `innerboard models` |
+| `curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/quickstart.sh \| bash` | One-command installation | Quick start script |
+| `innerboard setup` | Interactive setup wizard | `innerboard setup --docker` |
+| `innerboard health` | Comprehensive health check | `innerboard health --detailed` |
+| `./docker-setup.sh` | Docker deployment setup | Automated Docker setup |
+
+### **Core Commands**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `innerboard init` | Initialize encrypted vault | `innerboard init` |
+| `innerboard add "text"` | Add private reflection | `innerboard add "Struggling with auth tokens"` |
+| `innerboard list` | View saved reflections | `innerboard list --limit 10` |
+| `innerboard status` | Vault status and stats | `innerboard status` |
+
+### **Session Recording & Analysis**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `innerboard record` | Record terminal session | `innerboard record --name standup` |
+| `innerboard prep` | Generate meeting prep | `innerboard prep --show-sre` |
+| `innerboard models` | List available AI models | `innerboard models` |
+
+### **Management Commands**
+| Command | Description | Example |
+|---------|-------------|---------|
+| `innerboard clear` | Clear all data | `innerboard clear --force` |
+| `innerboard --help` | Show all commands | `innerboard add --help` |
 
 **Environment Variables:**
 ```bash
