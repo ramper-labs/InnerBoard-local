@@ -90,6 +90,7 @@ curl -fsSL https://raw.githubusercontent.com/ramper-labs/InnerBoard-local/main/q
 
 This script will:
 - ✅ Check your system prerequisites
+- ✅ Handle externally managed Python environments (creates virtual environment automatically)
 - ✅ Install InnerBoard-local automatically
 - ✅ Set up Ollama and download AI models
 - ✅ Initialize your encrypted vault
@@ -147,11 +148,34 @@ docker-compose exec innerboard innerboard init
 After installation, verify everything is working:
 
 ```bash
+# If using virtual environment (created automatically on some systems):
+source innerboard_venv/bin/activate
+
 # Check system health
 innerboard health
 
 # View available commands
 innerboard --help
+```
+
+**Note:** If the quickstart script created a virtual environment (`innerboard_venv`), you'll need to activate it each time you want to use InnerBoard-local:
+
+```bash
+# Activate virtual environment
+source innerboard_venv/bin/activate
+
+# Use InnerBoard normally
+innerboard add "My reflection"
+innerboard list
+
+# Deactivate when done
+deactivate
+```
+
+**Optional:** Add this to your `~/.bashrc` for convenience:
+```bash
+echo 'alias innerboard="source innerboard_venv/bin/activate && innerboard"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ---
@@ -308,6 +332,15 @@ innerboard models
 ### **Common Issues**
 
 #### **Setup Issues**
+
+**"externally-managed-environment" error:**
+```bash
+# The quickstart script automatically handles this by creating a virtual environment
+# If you need to do it manually:
+python3 -m venv innerboard_venv
+source innerboard_venv/bin/activate
+pip install -e .
+```
 
 **Quick start script fails:**
 ```bash

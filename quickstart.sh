@@ -1,7 +1,7 @@
 #!/bin/bash
 # InnerBoard-local Quick Start Script
 # This script helps new users get up and running quickly
-# Version: 2.1 - Fixed directory navigation and error handling
+# Version: 2.2 - Added virtual environment support for externally managed Python
 
 set -e
 
@@ -103,7 +103,7 @@ main() {
     # Step 2: Clone repository
     print_header "Step 2: Downloading InnerBoard-local"
     print_info "Working directory: $(pwd)"
-    print_info "Script version: 2.1"
+    print_info "Script version: 2.2"
 
     # Store original directory
     ORIGINAL_DIR="$(pwd)"
@@ -194,12 +194,56 @@ main() {
         print_success "pip installed"
     fi
 
+    # Check if we need a virtual environment (for externally managed environments)
+    VENV_DIR=""
+    if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" 2>/dev/null && \
+       python3 -c "import pip" 2>/dev/null; then
+        # Test if we can install packages without issues
+        if ! python3 -c "import sys; print('Testing pip install')" >/dev/null 2>&1 || \
+           ! python3 -m pip install --dry-run --quiet pip 2>/dev/null; then
+            print_warning "Detected externally managed Python environment"
+            print_info "Creating virtual environment to avoid installation conflicts..."
+
+            VENV_DIR="innerboard_venv"
+            if [[ -d "$VENV_DIR" ]]; then
+                print_info "Removing existing virtual environment..."
+                rm -rf "$VENV_DIR"
+            fi
+
+            if ! python3 -m venv "$VENV_DIR"; then
+                print_error "Failed to create virtual environment"
+                print_info "You can create one manually:"
+                echo "  python3 -m venv innerboard_venv"
+                echo "  source innerboard_venv/bin/activate"
+                echo "  pip install -e ."
+                exit 1
+            fi
+
+            print_success "Virtual environment created: $VENV_DIR"
+
+            # Activate virtual environment
+            source "$VENV_DIR/bin/activate"
+            print_info "Activated virtual environment"
+
+            # Update pip in virtual environment
+            python -m pip install --upgrade pip
+        fi
+    fi
+
     # Install InnerBoard
     print_info "Installing InnerBoard-local..."
-    if ! $PIP_CMD install -e .; then
+    if ! python -m pip install -e .; then
         print_error "Failed to install InnerBoard-local"
-        print_info "You may need to install dependencies manually:"
-        echo "  pip install -e ."
+        if [[ -n "$VENV_DIR" ]]; then
+            print_info "Virtual environment troubleshooting:"
+            echo "  source $VENV_DIR/bin/activate"
+            echo "  python -m pip install -e ."
+        else
+            print_info "System installation troubleshooting:"
+            echo "  pip install -e ."
+            echo "  # Or with system override:"
+            echo "  pip install --break-system-packages -e ."
+        fi
         exit 1
     fi
     print_success "InnerBoard-local installed"
@@ -269,33 +313,76 @@ main() {
     print_header "Step 6: Initializing Encrypted Vault"
 
     print_info "Setting up your secure vault..."
-    if ! innerboard init --no-interactive; then
-        print_warning "Vault initialization failed or requires manual setup"
-        print_info "You can initialize the vault manually later:"
-        echo "  innerboard init"
+    if [[ -n "$VENV_DIR" ]]; then
+        # Use virtual environment
+        if ! "$VENV_DIR/bin/python" -m app.cli init --no-interactive; then
+            print_warning "Vault initialization failed or requires manual setup"
+            print_info "You can initialize the vault manually:"
+            echo "  source $VENV_DIR/bin/activate"
+            echo "  innerboard init"
+        else
+            print_success "Vault initialized"
+        fi
     else
-        print_success "Vault initialized"
+        # Use system installation
+        if ! python -m app.cli init --no-interactive; then
+            print_warning "Vault initialization failed or requires manual setup"
+            print_info "You can initialize the vault manually:"
+            echo "  innerboard init"
+        else
+            print_success "Vault initialized"
+        fi
     fi
 
     # Step 7: Verify setup
     print_header "Step 7: Verifying Setup"
 
     print_info "Testing installation..."
-    if ! innerboard status; then
-        print_warning "Status check failed"
-        print_info "Setup may be incomplete. You can check status manually:"
-        echo "  innerboard status"
+    if [[ -n "$VENV_DIR" ]]; then
+        # Use virtual environment
+        if ! "$VENV_DIR/bin/python" -m app.cli status; then
+            print_warning "Status check failed"
+            print_info "Setup may be incomplete. You can check status manually:"
+            echo "  source $VENV_DIR/bin/activate"
+            echo "  innerboard status"
+        fi
+    else
+        # Use system installation
+        if ! python -m app.cli status; then
+            print_warning "Status check failed"
+            print_info "Setup may be incomplete. You can check status manually:"
+            echo "  innerboard status"
+        fi
     fi
 
     # Success!
     print_header "🎉 Setup Complete!"
     echo
     print_success "InnerBoard-local is ready to use!"
-    echo
-    print_info "Quick commands to get started:"
-    echo "  innerboard add \"Your first reflection here\""
-    echo "  innerboard list"
-    echo "  innerboard prep"
+
+    if [[ -n "$VENV_DIR" ]]; then
+        echo
+        print_info "📍 Virtual Environment Created"
+        echo "To use InnerBoard-local, activate the virtual environment:"
+        echo "  source $VENV_DIR/bin/activate"
+        echo
+        print_info "Quick commands to get started:"
+        echo "  source $VENV_DIR/bin/activate"
+        echo "  innerboard add \"Your first reflection here\""
+        echo "  innerboard list"
+        echo "  innerboard prep"
+        echo
+        print_info "Or create an alias for convenience:"
+        echo "  echo 'alias innerboard=\"source $VENV_DIR/bin/activate && innerboard\"' >> ~/.bashrc"
+        echo "  source ~/.bashrc"
+    else
+        echo
+        print_info "Quick commands to get started:"
+        echo "  innerboard add \"Your first reflection here\""
+        echo "  innerboard list"
+        echo "  innerboard prep"
+    fi
+
     echo
     print_info "For more help:"
     echo "  innerboard --help"
