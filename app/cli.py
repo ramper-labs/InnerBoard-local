@@ -743,8 +743,16 @@ def _init_vault(no_interactive: bool) -> bool:
     password = Prompt.ask(
         "Enter a password to encrypt your vault (leave empty for no password)",
         password=True,
-        confirmation_prompt=True
     )
+
+    if password:
+        confirm_password = Prompt.ask(
+            "Confirm password",
+            password=True,
+        )
+        if password != confirm_password:
+            console.print("[red]❌ Passwords do not match[/red]")
+            return False
 
     try:
         # Generate secure key
